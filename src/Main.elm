@@ -97,15 +97,19 @@ view model =
 
 
 displayGenreList : List (Maybe String) -> Html Msg
-displayGenreList someList =
-    div [] (List.map displayGenre someList)
+displayGenreList genreList =
+    div [ style "display" "flex", style "justify-content" "center" ]
+        [ ul [ style "list-style-type" "none" ] (List.map displayGenre genreList)
+        ]
 
 
 displayGenre : Maybe String -> Html Msg
 displayGenre genre =
     case genre of
         Just g ->
-            text g
+            li []
+                [ h5 [] [ text g ]
+                ]
 
         Nothing ->
             text "unknown genre"
