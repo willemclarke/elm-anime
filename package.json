@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "@dillonkearns/elm-graphql": "^4.2.2"
+  },
+  "scripts": {
+    "api": "npx elm-graphql https://graphql.anilist.co/ --base AniList"
+  }
+}
