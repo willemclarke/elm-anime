@@ -1,34 +1,56 @@
 module Main exposing (..)
 
 import AniList.Object
+import AniList.Object.Media as Media
+import AniList.Object.Page as Page
 import AniList.Query as Query
 import Browser
-import Char exposing (toUpper)
 import Graphql.Document as Document
 import Graphql.Http
 import Graphql.Http.GraphqlError
 import Graphql.Operation exposing (RootQuery)
-import Graphql.OptionalArgument exposing (OptionalArgument(..))
+import Graphql.OptionalArgument exposing (..)
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
 import Html.Attributes exposing (height, placeholder, src, style, value, width)
 import Html.Events exposing (..)
 import Http
-import Maybe exposing (withDefault)
+import Process exposing (Id)
 import RemoteData exposing (RemoteData)
 
 
 
+-- query {
+--   Page(page: 1) {
+--     media {
+--       id
+--     }
+--   }
+-- }
 ---- MODEL ----
 
 
-type alias AniListResponse =
-    Maybe (List (Maybe String))
+type alias PageQuery =
+    { page : MediaQuery }
 
 
-query : SelectionSet AniListResponse RootQuery
+type alias MediaQuery =
+    { id : Int }
+
+
+query : SelectionSet (Maybe PageQuery) RootQuery
 query =
-    Query.genreCollection
+    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 20 }) pageSelection
+
+
+pageSelection : SelectionSet PageQuery AniList.Object.Page
+pageSelection =
+    SelectionSet.map PageQuery mediaSelection
+
+
+mediaSelection : SelectionSet MediaQuery AniList.Object.Media
+mediaSelection =
+    SelectionSet.map MediaQuery Media.id
 
 
 makeRequest : Cmd Msg
@@ -39,7 +61,7 @@ makeRequest =
 
 
 type alias Model =
-    RemoteData (Graphql.Http.Error AniListResponse) AniListResponse
+    RemoteData (Graphql.Http.Error (Maybe Int)) (Maybe Int)
 
 
 init : () -> ( Model, Cmd Msg )
@@ -90,7 +112,7 @@ view model =
         RemoteData.Success response ->
             case response of
                 Just listOfGenres ->
-                    displayGenreList listOfGenres
+                    text "Heh"
 
                 Nothing ->
                     text "No genres found."
