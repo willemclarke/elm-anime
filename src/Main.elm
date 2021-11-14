@@ -30,27 +30,24 @@ import RemoteData exposing (RemoteData)
 ---- MODEL ----
 
 
-type alias PageQuery =
-    { page : MediaQuery }
+type alias Response =
+    Maybe Media
 
 
-type alias MediaQuery =
-    { id : Int }
+type alias Media =
+    { id : Int, averageScore : Maybe Int }
 
 
-query : SelectionSet (Maybe PageQuery) RootQuery
+query : SelectionSet (Maybe Media) RootQuery
 query =
-    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 20 }) pageSelection
+    Query.media (\optionals -> { optionals | id = Present 1 }) mediaSelection
 
 
-pageSelection : SelectionSet PageQuery AniList.Object.Page
-pageSelection =
-    SelectionSet.map PageQuery mediaSelection
-
-
-mediaSelection : SelectionSet MediaQuery AniList.Object.Media
+mediaSelection : SelectionSet Media AniList.Object.Media
 mediaSelection =
-    SelectionSet.map MediaQuery Media.id
+    SelectionSet.map2 Media
+        Media.id
+        Media.averageScore
 
 
 makeRequest : Cmd Msg
@@ -61,7 +58,7 @@ makeRequest =
 
 
 type alias Model =
-    RemoteData (Graphql.Http.Error (Maybe Int)) (Maybe Int)
+    RemoteData (Graphql.Http.Error Response) Response
 
 
 init : () -> ( Model, Cmd Msg )
@@ -111,8 +108,8 @@ view model =
 
         RemoteData.Success response ->
             case response of
-                Just listOfGenres ->
-                    text "Heh"
+                Just media ->
+                    text (Debug.toString media)
 
                 Nothing ->
                     text "No genres found."
