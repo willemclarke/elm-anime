@@ -1,18 +1,17 @@
 module Main exposing (..)
 
--- import AniList.Enum.MediaType.MediaType as MediaType
+-- import AniList.Enum.MediaType
+-- import Browser
+-- import Graphql.Document as Document
+-- import Graphql.Http.GraphqlError
 
 import AniList.Enum.MediaFormat
-import AniList.Enum.MediaType
 import AniList.Object
 import AniList.Object.Media as Media
 import AniList.Object.MediaTitle as MediaTitle
 import AniList.Object.Page as Page
 import AniList.Query as Query
-import Browser
-import Graphql.Document as Document
 import Graphql.Http
-import Graphql.Http.GraphqlError
 import Graphql.Operation exposing (RootQuery)
 import Graphql.OptionalArgument exposing (..)
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
@@ -20,6 +19,12 @@ import Html exposing (..)
 import Html.Attributes exposing (height, placeholder, src, style, value, width)
 import Html.Events exposing (..)
 import Http
+import Loading
+    exposing
+        ( LoaderType(..)
+        , defaultConfig
+        , render
+        )
 import Process exposing (Id)
 import RemoteData exposing (RemoteData)
 
@@ -60,6 +65,10 @@ query =
     Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 10 }) pageSelection
 
 
+
+-- where `identity` replace with optional arguments to only dispaly 'manga'
+
+
 pageSelection : SelectionSet Page AniList.Object.Page
 pageSelection =
     SelectionSet.map Page (Page.media identity mediaSelection)
@@ -86,6 +95,10 @@ makeRequest =
         |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
 
 
+type Msg
+    = GotResponse Model
+
+
 type alias Model =
     RemoteData (Graphql.Http.Error Response) Response
 
@@ -97,10 +110,6 @@ init _ =
 
 
 ---- UPDATE ----
-
-
-type Msg
-    = GotResponse Model
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -127,7 +136,7 @@ view : Model -> Html Msg
 view model =
     case model of
         RemoteData.Loading ->
-            text "Loading"
+            loadingSpinner
 
         RemoteData.NotAsked ->
             text "not asked is true"
@@ -142,6 +151,16 @@ view model =
 
                 Nothing ->
                     text "No genres found."
+
+
+loadingSpinner : Html Msg
+loadingSpinner =
+    div []
+        [ Loading.render
+            Circle
+            { defaultConfig | color = "#333" }
+            Loading.On
+        ]
 
 
 displayGenreList : List (Maybe String) -> Html Msg
@@ -171,7 +190,3 @@ main =
         , update = update
         , subscriptions = always Sub.none
         }
-
-
-
----- HELPERS ----
