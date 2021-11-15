@@ -1,34 +1,82 @@
 module Main exposing (..)
 
+-- import AniList.Enum.MediaType.MediaType as MediaType
+
+import AniList.Enum.MediaFormat
+import AniList.Enum.MediaType
 import AniList.Object
+import AniList.Object.Media as Media
+import AniList.Object.MediaTitle as MediaTitle
+import AniList.Object.Page as Page
 import AniList.Query as Query
 import Browser
-import Char exposing (toUpper)
 import Graphql.Document as Document
 import Graphql.Http
 import Graphql.Http.GraphqlError
 import Graphql.Operation exposing (RootQuery)
-import Graphql.OptionalArgument exposing (OptionalArgument(..))
+import Graphql.OptionalArgument exposing (..)
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
 import Html.Attributes exposing (height, placeholder, src, style, value, width)
 import Html.Events exposing (..)
 import Http
-import Maybe exposing (withDefault)
+import Process exposing (Id)
 import RemoteData exposing (RemoteData)
 
 
 
+-- {
+--   Page(page: 1, perPage: 20) {
+--     media(type: MANGA) {
+--       id
+--       averageScore
+--       title {
+--         english
+--       }
+--     }
+--   }
+-- }
 ---- MODEL ----
 
 
-type alias AniListResponse =
-    Maybe (List (Maybe String))
+type alias Response =
+    Maybe Page
 
 
-query : SelectionSet AniListResponse RootQuery
+type alias Page =
+    { media : Maybe (List (Maybe Media)) }
+
+
+type alias Media =
+    { id : Int, averageScore : Maybe Int, title : Maybe Title }
+
+
+type alias Title =
+    { english : Maybe String }
+
+
+query : SelectionSet (Maybe Page) RootQuery
 query =
-    Query.genreCollection
+    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 10 }) pageSelection
+
+
+pageSelection : SelectionSet Page AniList.Object.Page
+pageSelection =
+    SelectionSet.map Page (Page.media identity mediaSelection)
+
+
+mediaSelection : SelectionSet Media AniList.Object.Media
+mediaSelection =
+    SelectionSet.map3 Media
+        Media.id
+        Media.averageScore
+        (Media.title titleSelection)
+
+
+titleSelection : SelectionSet Title AniList.Object.MediaTitle
+titleSelection =
+    SelectionSet.map Title
+        (MediaTitle.english identity)
 
 
 makeRequest : Cmd Msg
@@ -39,7 +87,7 @@ makeRequest =
 
 
 type alias Model =
-    RemoteData (Graphql.Http.Error AniListResponse) AniListResponse
+    RemoteData (Graphql.Http.Error Response) Response
 
 
 init : () -> ( Model, Cmd Msg )
@@ -89,8 +137,8 @@ view model =
 
         RemoteData.Success response ->
             case response of
-                Just listOfGenres ->
-                    displayGenreList listOfGenres
+                Just media ->
+                    text (Debug.toString media)
 
                 Nothing ->
                     text "No genres found."
