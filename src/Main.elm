@@ -4,7 +4,7 @@ module Main exposing (..)
 -- import Graphql.Document as Document
 -- import Graphql.Http.GraphqlError
 
-import AniList.Enum.MediaFormat
+import AniList.Enum.MediaType
 import AniList.Object
 import AniList.Object.Media as Media
 import AniList.Object.MediaTitle as MediaTitle
@@ -18,7 +18,6 @@ import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
 import Html.Attributes exposing (class, height, placeholder, src, style, value, width)
 import Html.Events exposing (..)
-import Http
 import Loading
     exposing
         ( LoaderType(..)
@@ -55,7 +54,7 @@ type alias Manga =
 
 
 type alias Title =
-    { romaji : Maybe String }
+    { romaji : Maybe String, english : Maybe String }
 
 
 init : () -> ( Model, Cmd Msg )
@@ -74,7 +73,7 @@ query =
 
 pageSelection : SelectionSet Page AniList.Object.Page
 pageSelection =
-    SelectionSet.map Page (Page.media identity mediaSelection)
+    SelectionSet.map Page (Page.media (\optionals -> { optionals | type_ = Present AniList.Enum.MediaType.Manga }) mediaSelection)
 
 
 mediaSelection : SelectionSet Manga AniList.Object.Media
@@ -87,8 +86,9 @@ mediaSelection =
 
 titleSelection : SelectionSet Title AniList.Object.MediaTitle
 titleSelection =
-    SelectionSet.map Title
+    SelectionSet.map2 Title
         (MediaTitle.english identity)
+        (MediaTitle.romaji identity)
 
 
 makeRequest : Cmd Msg
@@ -198,7 +198,7 @@ sanitizeTitle title =
             t
 
         Nothing ->
-            { romaji = Nothing }
+            { romaji = Nothing, english = Nothing }
 
 
 sanitizeAverageScore : Maybe Int -> String
