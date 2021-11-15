@@ -4,5 +4,6 @@
   },
   "scripts": {
     "api": "npx elm-graphql https://graphql.anilist.co/ --base AniList"
-  }
+  },
+  "dependencies": {}
 }

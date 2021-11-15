@@ -1,7 +1,6 @@
 module Main exposing (..)
 
 -- import AniList.Enum.MediaType
--- import Browser
 -- import Graphql.Document as Document
 -- import Graphql.Http.GraphqlError
 
@@ -11,12 +10,13 @@ import AniList.Object.Media as Media
 import AniList.Object.MediaTitle as MediaTitle
 import AniList.Object.Page as Page
 import AniList.Query as Query
+import Browser
 import Graphql.Http
 import Graphql.Operation exposing (RootQuery)
 import Graphql.OptionalArgument exposing (..)
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
-import Html.Attributes exposing (height, placeholder, src, style, value, width)
+import Html.Attributes exposing (class, height, placeholder, src, style, value, width)
 import Html.Events exposing (..)
 import Http
 import Loading
@@ -25,23 +25,21 @@ import Loading
         , defaultConfig
         , render
         )
+import Maybe exposing (withDefault)
 import Process exposing (Id)
 import RemoteData exposing (RemoteData)
 
 
 
--- {
---   Page(page: 1, perPage: 20) {
---     media(type: MANGA) {
---       id
---       averageScore
---       title {
---         english
---       }
---     }
---   }
--- }
 ---- MODEL ----
+
+
+type Msg
+    = GotResponse Model
+
+
+type alias Model =
+    RemoteData (Graphql.Http.Error Response) Response
 
 
 type alias Response =
@@ -49,15 +47,20 @@ type alias Response =
 
 
 type alias Page =
-    { media : Maybe (List (Maybe Media)) }
+    { manga : Maybe (List (Maybe Manga)) }
 
 
-type alias Media =
+type alias Manga =
     { id : Int, averageScore : Maybe Int, title : Maybe Title }
 
 
 type alias Title =
-    { english : Maybe String }
+    { romaji : Maybe String }
+
+
+init : () -> ( Model, Cmd Msg )
+init _ =
+    ( RemoteData.Loading, makeRequest )
 
 
 query : SelectionSet (Maybe Page) RootQuery
@@ -74,9 +77,9 @@ pageSelection =
     SelectionSet.map Page (Page.media identity mediaSelection)
 
 
-mediaSelection : SelectionSet Media AniList.Object.Media
+mediaSelection : SelectionSet Manga AniList.Object.Media
 mediaSelection =
-    SelectionSet.map3 Media
+    SelectionSet.map3 Manga
         Media.id
         Media.averageScore
         (Media.title titleSelection)
@@ -93,19 +96,6 @@ makeRequest =
     query
         |> Graphql.Http.queryRequest "https://graphql.anilist.co/"
         |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
-
-
-type Msg
-    = GotResponse Model
-
-
-type alias Model =
-    RemoteData (Graphql.Http.Error Response) Response
-
-
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( RemoteData.Loading, makeRequest )
 
 
 
@@ -134,23 +124,42 @@ subscriptions _ =
 
 view : Model -> Html Msg
 view model =
-    case model of
-        RemoteData.Loading ->
-            loadingSpinner
+    let
+        children =
+            case model of
+                RemoteData.Loading ->
+                    loadingSpinner
 
-        RemoteData.NotAsked ->
-            text "not asked is true"
+                RemoteData.NotAsked ->
+                    text "not asked is true"
 
-        RemoteData.Failure _ ->
-            text "unable to fetch genres"
+                RemoteData.Failure _ ->
+                    text "unable to fetch genres"
 
-        RemoteData.Success response ->
-            case response of
-                Just media ->
-                    text (Debug.toString media)
+                RemoteData.Success response ->
+                    case response of
+                        Just page ->
+                            displayMangaList (sanitizeMangaList page.manga)
 
-                Nothing ->
-                    text "No genres found."
+                        Nothing ->
+                            text "No genres found."
+    in
+    baseLayout children
+
+
+main : Program () Model Msg
+main =
+    Browser.element
+        { view = view
+        , init = init
+        , update = update
+        , subscriptions = always Sub.none
+        }
+
+
+baseLayout : Html Msg -> Html Msg
+baseLayout children =
+    div [ class "flex justify-center h-full bg-grey-100 mt-6" ] [ children ]
 
 
 loadingSpinner : Html Msg
@@ -163,30 +172,53 @@ loadingSpinner =
         ]
 
 
-displayGenreList : List (Maybe String) -> Html Msg
-displayGenreList genreList =
-    div [ style "display" "flex", style "justify-content" "center" ]
-        [ ul [ style "list-style-type" "none" ] (List.map displayGenre genreList)
-        ]
-
-
-displayGenre : Maybe String -> Html Msg
-displayGenre genre =
-    case genre of
-        Just g ->
-            li []
-                [ h5 [] [ text g ]
-                ]
+sanitizeMangaList : Maybe (List (Maybe Manga)) -> List Manga
+sanitizeMangaList mangaList =
+    case mangaList of
+        Just list ->
+            List.filterMap identity list
 
         Nothing ->
-            text "unknown genre"
+            []
 
 
-main : Program () Model Msg
-main =
-    Browser.element
-        { view = view
-        , init = init
-        , update = update
-        , subscriptions = always Sub.none
-        }
+displayMangaList : List Manga -> Html Msg
+displayMangaList mangaList =
+    div [ class "flex justify-center h-96 bg-grey-500" ]
+        (List.map
+            (\manga -> displayManga manga)
+            mangaList
+        )
+
+
+sanitizeTitle : Maybe Title -> Title
+sanitizeTitle title =
+    case title of
+        Just t ->
+            t
+
+        Nothing ->
+            { romaji = Nothing }
+
+
+sanitizeAverageScore : Maybe Int -> String
+sanitizeAverageScore score =
+    case score of
+        Just s ->
+            String.fromInt s
+
+        Nothing ->
+            "No score"
+
+
+displayManga : Manga -> Html Msg
+displayManga manga =
+    let
+        sanitizedTitle =
+            sanitizeTitle manga.title
+    in
+    div [ class "h-4 m-4 w-24" ]
+        [ p [ class "text-xl" ] [ text (Maybe.withDefault "No Title found" sanitizedTitle.romaji) ]
+        , p [ class "text-base" ] [ text ("Score: " ++ sanitizeAverageScore manga.averageScore) ]
+        , p [ class "text-base" ] [ text ("Id: " ++ String.fromInt manga.id) ]
+        ]
