@@ -7,6 +7,7 @@ module Main exposing (..)
 import AniList.Enum.MediaType
 import AniList.Object
 import AniList.Object.Media as Media
+import AniList.Object.MediaCoverImage as CoverImage
 import AniList.Object.MediaTitle as MediaTitle
 import AniList.Object.Page as Page
 import AniList.Query as Query
@@ -16,7 +17,7 @@ import Graphql.Operation exposing (RootQuery)
 import Graphql.OptionalArgument exposing (..)
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
-import Html.Attributes exposing (class, height, placeholder, src, style, value, width)
+import Html.Attributes exposing (class, height, href, placeholder, src, style, value, width)
 import Html.Events exposing (..)
 import Loading
     exposing
@@ -25,6 +26,7 @@ import Loading
         , render
         )
 import Maybe exposing (withDefault)
+import Maybe.Extra exposing (or)
 import Process exposing (Id)
 import RemoteData exposing (RemoteData)
 
@@ -50,11 +52,15 @@ type alias Page =
 
 
 type alias Manga =
-    { id : Int, averageScore : Maybe Int, title : Maybe Title }
+    { id : Int, averageScore : Maybe Int, title : Maybe Title, coverImage : Maybe CoverImage }
 
 
 type alias Title =
     { romaji : Maybe String, english : Maybe String }
+
+
+type alias CoverImage =
+    { large : Maybe String }
 
 
 init : () -> ( Model, Cmd Msg )
@@ -64,11 +70,11 @@ init _ =
 
 query : SelectionSet (Maybe Page) RootQuery
 query =
-    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 10 }) pageSelection
+    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 8 }) pageSelection
 
 
 
--- where `identity` replace with optional arguments to only dispaly 'manga'
+-- try add second optional argument for enum to `SORT_DESC`'
 
 
 pageSelection : SelectionSet Page AniList.Object.Page
@@ -78,10 +84,11 @@ pageSelection =
 
 mediaSelection : SelectionSet Manga AniList.Object.Media
 mediaSelection =
-    SelectionSet.map3 Manga
+    SelectionSet.map4 Manga
         Media.id
         Media.averageScore
         (Media.title titleSelection)
+        (Media.coverImage coverImageSelection)
 
 
 titleSelection : SelectionSet Title AniList.Object.MediaTitle
@@ -89,6 +96,12 @@ titleSelection =
     SelectionSet.map2 Title
         (MediaTitle.english identity)
         (MediaTitle.romaji identity)
+
+
+coverImageSelection : SelectionSet CoverImage AniList.Object.MediaCoverImage
+coverImageSelection =
+    SelectionSet.map CoverImage
+        CoverImage.large
 
 
 makeRequest : Cmd Msg
@@ -172,6 +185,25 @@ loadingSpinner =
         ]
 
 
+displayMangaList : List Manga -> Html Msg
+displayMangaList mangaList =
+    div [ class "p-16 grid grid-cols-1 sm:grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-5" ]
+        (List.map displayManga mangaList)
+
+
+displayManga : Manga -> Html Msg
+displayManga manga =
+    div [ class "w-48 h-100 rounded overflow-hidden shadow-lg" ]
+        [ img [ src (sanitizeCoverImage manga.coverImage), class "max-w-full" ]
+            []
+        , div
+            []
+            [ p [ class "text-l font-bold truncate " ] [ text (sanitizeTitle manga.title) ]
+            , p [ class "text-m px-2 pt-2 pb-2 text-gray-700" ] [ text ("Score: " ++ sanitizeAverageScore manga.averageScore ++ "/100") ]
+            ]
+        ]
+
+
 sanitizeMangaList : Maybe (List (Maybe Manga)) -> List Manga
 sanitizeMangaList mangaList =
     case mangaList of
@@ -182,23 +214,24 @@ sanitizeMangaList mangaList =
             []
 
 
-displayMangaList : List Manga -> Html Msg
-displayMangaList mangaList =
-    div [ class "flex justify-center h-96 bg-grey-500" ]
-        (List.map
-            (\manga -> displayManga manga)
-            mangaList
-        )
-
-
-sanitizeTitle : Maybe Title -> Title
+sanitizeTitle : Maybe Title -> String
 sanitizeTitle title =
     case title of
-        Just t ->
-            t
+        Just { romaji, english } ->
+            Maybe.withDefault "No title found" (or romaji english)
 
         Nothing ->
-            { romaji = Nothing, english = Nothing }
+            "No title found"
+
+
+sanitizeCoverImage : Maybe CoverImage -> String
+sanitizeCoverImage image =
+    case image of
+        Just { large } ->
+            Maybe.withDefault "No image found" large
+
+        Nothing ->
+            "No image found"
 
 
 sanitizeAverageScore : Maybe Int -> String
@@ -209,16 +242,3 @@ sanitizeAverageScore score =
 
         Nothing ->
             "No score"
-
-
-displayManga : Manga -> Html Msg
-displayManga manga =
-    let
-        sanitizedTitle =
-            sanitizeTitle manga.title
-    in
-    div [ class "h-4 m-4 w-24" ]
-        [ p [ class "text-xl" ] [ text (Maybe.withDefault "No Title found" sanitizedTitle.romaji) ]
-        , p [ class "text-base" ] [ text ("Score: " ++ sanitizeAverageScore manga.averageScore) ]
-        , p [ class "text-base" ] [ text ("Id: " ++ String.fromInt manga.id) ]
-        ]
