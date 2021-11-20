@@ -1,5 +1,6 @@
 module Main exposing (..)
 
+import AniList.Enum.MediaSort
 import AniList.Enum.MediaType
 import AniList.Object
 import AniList.Object.Media as Media
@@ -14,7 +15,7 @@ import Graphql.OptionalArgument exposing (..)
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
 import Html.Attributes exposing (class, height, href, placeholder, src, style, value, width)
-import Html.Events exposing (..)
+import Html.Events exposing (onMouseOver)
 import Loading
     exposing
         ( LoaderType(..)
@@ -33,6 +34,7 @@ import RemoteData exposing (RemoteData)
 
 type Msg
     = GotResponse Model
+    | ShowExtraInfo
 
 
 type alias Model =
@@ -48,7 +50,7 @@ type alias Page =
 
 
 type alias Manga =
-    { id : Int, averageScore : Maybe Int, title : Maybe Title, coverImage : Maybe CoverImage, genres : Maybe Genres }
+    { id : Int, averageScore : Maybe Int, title : Maybe Title, coverImage : Maybe CoverImage, genres : Maybe (List (Maybe String)) }
 
 
 type alias Title =
@@ -59,10 +61,6 @@ type alias CoverImage =
     { large : Maybe String }
 
 
-type alias Genres =
-    List (Maybe String)
-
-
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( RemoteData.Loading, makeRequest )
@@ -70,7 +68,7 @@ init _ =
 
 query : SelectionSet (Maybe Page) RootQuery
 query =
-    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 30 }) pageSelection
+    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 100 }) pageSelection
 
 
 
@@ -79,7 +77,7 @@ query =
 
 pageSelection : SelectionSet Page AniList.Object.Page
 pageSelection =
-    SelectionSet.map Page (Page.media (\optionals -> { optionals | type_ = Present AniList.Enum.MediaType.Manga }) mediaSelection)
+    SelectionSet.map Page (Page.media (\optionals -> { optionals | type_ = Present AniList.Enum.MediaType.Manga, sort = Present [ Just AniList.Enum.MediaSort.ScoreDesc ] }) mediaSelection)
 
 
 mediaSelection : SelectionSet Manga AniList.Object.Media
@@ -121,6 +119,9 @@ update msg model =
     case msg of
         GotResponse response ->
             ( response, Cmd.none )
+
+        ShowExtraInfo ->
+            ( model, Cmd.none )
 
 
 
@@ -192,23 +193,47 @@ displayMangaList mangaList =
         (List.map displayManga mangaList)
 
 
+
+-- best card height = h-80, for now using h-96, revert eventually
+
+
 displayManga : Manga -> Html Msg
 displayManga manga =
-    div [ class "w-48 h-80 text-center text-gray-800 bg-white rounded overflow-hidden shadow-lg hover:shadow-2xl" ]
-        [ img [ src (sanitizeCoverImage manga.coverImage), class "h-72 w-full" ]
-            []
-        , div
-            []
-            [ p [ class "text-l font-bold truncate mt-1 " ] [ text (sanitizeTitle manga.title) ]
-
-            -- , p [ class "text-m px-2 pt-2 pb-2 text-gray-700" ] [ text ("Score: " ++ sanitizeAverageScore manga.averageScore ++ "/100") ]
+    a [ href ("https://anilist.co/manga/" ++ String.fromInt manga.id) ]
+        [ div [ class "w-48 h-96 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:shadow-2xl hover:text-indigo-900" ]
+            [ img [ src (sanitizeCoverImage manga.coverImage), class "h-72 w-full" ]
+                []
+            , div
+                []
+                [ p [ class "text-l font-bold truncate mt-1 " ] [ text (sanitizeTitle manga.title) ]
+                ]
+            , displayGenres (sanitizeGenres manga.genres)
             ]
         ]
+
+
+displayGenres : List String -> Html Msg
+displayGenres genres =
+    div [ class "px-2 pt-2" ]
+        (List.map
+            (\genre -> span [ class "inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2" ] [ text ("#" ++ genre) ])
+            genres
+        )
 
 
 sanitizeMangaList : Maybe (List (Maybe Manga)) -> List Manga
 sanitizeMangaList mangaList =
     case mangaList of
+        Just list ->
+            List.filterMap identity list
+
+        Nothing ->
+            []
+
+
+sanitizeGenres : Maybe (List (Maybe String)) -> List String
+sanitizeGenres genreList =
+    case genreList of
         Just list ->
             List.filterMap identity list
 
