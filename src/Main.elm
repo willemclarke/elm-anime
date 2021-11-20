@@ -226,24 +226,27 @@ displayManga : Manga -> Html Msg
 displayManga manga =
     a [ href ("https://anilist.co/manga/" ++ String.fromInt manga.id) ]
         [ div [ class "w-48 h-80 text-center text-gray-700 bg-white rounded overflow-hidden shadow-2xl hover:text-indigo-900" ]
-            [ img [ src (sanitizeCoverImage manga.coverImage), class "h-72 w-full" ]
+            [ img [ src (sanitizeCoverImage manga.coverImage), class "h-64 w-full" ]
                 []
             , div
                 []
-                [ p [ class "text-l font-bold truncate mx-2 mt-1 mb-2 " ] [ text (sanitizeTitle manga.title) ]
+                [ p [ class "text-l font-bold truncate mx-2 mt-1 mb-1 " ] [ text (sanitizeTitle manga.title) ]
+                , displayGenres (sanitizeGenres manga.genres)
                 ]
-
-            -- , displayGenres (sanitizeGenres manga.genres)
             ]
         ]
 
 
 displayGenres : List String -> Html Msg
 displayGenres genres =
-    div [ class "px-2 pt-2" ]
+    let
+        firstTwoGenres =
+            List.take 2 genres
+    in
+    div [ class "mx-2" ]
         (List.map
-            (\genre -> span [ class "inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2" ] [ text ("#" ++ genre) ])
-            genres
+            (\genre -> span [ class "inline-block bg-blue-200 rounded-full px-2 text-xs font-semibold text-gray-700 mr-1 mb-1" ] [ text genre ])
+            firstTwoGenres
         )
 
 
