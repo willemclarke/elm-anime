@@ -14,7 +14,7 @@ import Graphql.Operation exposing (RootQuery)
 import Graphql.OptionalArgument exposing (..)
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
-import Html.Attributes exposing (class, height, href, placeholder, src, style, value, width)
+import Html.Attributes exposing (class, height, href, placeholder, src, style, type_, value, width)
 import Html.Events exposing (onMouseOver)
 import Loading
     exposing
@@ -151,6 +151,7 @@ view model =
                         Just page ->
                             div []
                                 [ siteTitle
+                                , filters
                                 , displayMangaList
                                     (sanitizeMangaList page.manga)
                                 ]
@@ -186,6 +187,21 @@ siteTitle =
     h1 [ class "text-center mt-2 text-2xl filter drop-shadow-md font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "ELMANGA" ]
 
 
+filters : Html Msg
+filters =
+    div [ class "flex justify-start mt-10 mx-16" ] [ searchFilter ]
+
+
+searchFilter : Html Msg
+searchFilter =
+    div []
+        [ div [ class "text-gray-700 " ] [ text "Search" ]
+        , div []
+            [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search" ] []
+            ]
+        ]
+
+
 loadingSpinner : Html Msg
 loadingSpinner =
     div [ class "flex items-center h-full" ]
@@ -198,7 +214,7 @@ loadingSpinner =
 
 displayMangaList : List Manga -> Html Msg
 displayMangaList mangaList =
-    div [ class "px-16 pt-8 pb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5" ]
+    div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5" ]
         (List.map displayManga mangaList)
 
 
@@ -214,9 +230,10 @@ displayManga manga =
                 []
             , div
                 []
-                [ p [ class "text-l font-bold truncate m-2 " ] [ text (sanitizeTitle manga.title) ]
+                [ p [ class "text-l font-bold truncate mx-2 mt-1 mb-2 " ] [ text (sanitizeTitle manga.title) ]
                 ]
-            , displayGenres (sanitizeGenres manga.genres)
+
+            -- , displayGenres (sanitizeGenres manga.genres)
             ]
         ]
 
