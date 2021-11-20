@@ -14,7 +14,7 @@ import Graphql.Operation exposing (RootQuery)
 import Graphql.OptionalArgument exposing (..)
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
-import Html.Attributes exposing (class, height, href, placeholder, src, style, value, width)
+import Html.Attributes exposing (class, height, href, placeholder, src, style, type_, value, width)
 import Html.Events exposing (onMouseOver)
 import Loading
     exposing
@@ -24,7 +24,6 @@ import Loading
         )
 import Maybe exposing (withDefault)
 import Maybe.Extra exposing (or)
-import Process exposing (Id)
 import RemoteData exposing (RemoteData)
 
 
@@ -69,10 +68,6 @@ init _ =
 query : SelectionSet (Maybe Page) RootQuery
 query =
     Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 100 }) pageSelection
-
-
-
--- try add second optional argument for enum to `SORT_DESC`'
 
 
 pageSelection : SelectionSet Page AniList.Object.Page
@@ -154,7 +149,12 @@ view model =
                 RemoteData.Success response ->
                     case response of
                         Just page ->
-                            displayMangaList (sanitizeMangaList page.manga)
+                            div []
+                                [ siteTitle
+                                , filters
+                                , displayMangaList
+                                    (sanitizeMangaList page.manga)
+                                ]
 
                         Nothing ->
                             text "No genres found."
@@ -172,14 +172,39 @@ main =
         }
 
 
+
+-- Fix baseLayout so that the siteTitle is above the children...
+
+
 baseLayout : Html Msg -> Html Msg
 baseLayout children =
-    div [ class "flex justify-center h-100vh bg-gray-100 mt-6" ] [ children ]
+    div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
+        [ children ]
+
+
+siteTitle : Html Msg
+siteTitle =
+    h1 [ class "text-center mt-2 text-2xl filter drop-shadow-md font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "ELMANGA" ]
+
+
+filters : Html Msg
+filters =
+    div [ class "flex justify-start mt-10 mx-16" ] [ searchFilter ]
+
+
+searchFilter : Html Msg
+searchFilter =
+    div []
+        [ div [ class "text-gray-700 " ] [ text "Search" ]
+        , div []
+            [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search" ] []
+            ]
+        ]
 
 
 loadingSpinner : Html Msg
 loadingSpinner =
-    div []
+    div [ class "flex items-center h-full" ]
         [ Loading.render
             Circle
             { defaultConfig | color = "#333" }
@@ -189,7 +214,7 @@ loadingSpinner =
 
 displayMangaList : List Manga -> Html Msg
 displayMangaList mangaList =
-    div [ class "p-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5" ]
+    div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5" ]
         (List.map displayManga mangaList)
 
 
@@ -200,40 +225,34 @@ displayMangaList mangaList =
 displayManga : Manga -> Html Msg
 displayManga manga =
     a [ href ("https://anilist.co/manga/" ++ String.fromInt manga.id) ]
-        [ div [ class "w-48 h-96 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:shadow-2xl hover:text-indigo-900" ]
-            [ img [ src (sanitizeCoverImage manga.coverImage), class "h-72 w-full" ]
+        [ div [ class "w-48 h-80 text-center text-gray-700 bg-white rounded overflow-hidden shadow-2xl hover:text-indigo-900" ]
+            [ img [ src (sanitizeCoverImage manga.coverImage), class "h-64 w-full" ]
                 []
             , div
                 []
-                [ p [ class "text-l font-bold truncate mt-1 " ] [ text (sanitizeTitle manga.title) ]
+                [ p [ class "text-l font-bold truncate mx-2 mt-1 mb-1 " ] [ text (sanitizeTitle manga.title) ]
+                , displayGenres (sanitizeGenres manga.genres)
                 ]
-            , displayGenres (sanitizeGenres manga.genres)
             ]
         ]
 
 
 displayGenres : List String -> Html Msg
 displayGenres genres =
-    div [ class "px-2 pt-2" ]
+    let
+        firstTwoGenres =
+            List.take 2 genres
+    in
+    div [ class "mx-2" ]
         (List.map
-            (\genre -> span [ class "inline-block bg-gray-200 rounded-full px-3 py-1 text-sm font-semibold text-gray-700 mr-2 mb-2" ] [ text ("#" ++ genre) ])
-            genres
+            (\genre -> span [ class "inline-block bg-blue-200 rounded-full px-2 text-xs font-semibold text-gray-700 mr-1 mb-1" ] [ text genre ])
+            firstTwoGenres
         )
 
 
 sanitizeMangaList : Maybe (List (Maybe Manga)) -> List Manga
 sanitizeMangaList mangaList =
     case mangaList of
-        Just list ->
-            List.filterMap identity list
-
-        Nothing ->
-            []
-
-
-sanitizeGenres : Maybe (List (Maybe String)) -> List String
-sanitizeGenres genreList =
-    case genreList of
         Just list ->
             List.filterMap identity list
 
@@ -259,6 +278,16 @@ sanitizeCoverImage image =
 
         Nothing ->
             "No image found"
+
+
+sanitizeGenres : Maybe (List (Maybe String)) -> List String
+sanitizeGenres genreList =
+    case genreList of
+        Just list ->
+            List.filterMap identity list
+
+        Nothing ->
+            []
 
 
 sanitizeAverageScore : Maybe Int -> String
