@@ -7,5 +7,7 @@
     "start": "elm-app start",
     "build": "elm-app build"
   },
-  "dependencies": {}
+  "dependencies": {
+    "create-elm-app": "^5.22.0"
+  }
 }
