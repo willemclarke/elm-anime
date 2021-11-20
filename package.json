@@ -3,7 +3,9 @@
     "@dillonkearns/elm-graphql": "^4.2.2"
   },
   "scripts": {
-    "api": "npx elm-graphql https://graphql.anilist.co/ --base AniList"
+    "api": "npx elm-graphql https://graphql.anilist.co/ --base AniList",
+    "start": "elm-app start",
+    "build": "elm-app build"
   },
   "dependencies": {}
 }
