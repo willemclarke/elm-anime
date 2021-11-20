@@ -24,7 +24,6 @@ import Loading
         )
 import Maybe exposing (withDefault)
 import Maybe.Extra exposing (or)
-import Process exposing (Id)
 import RemoteData exposing (RemoteData)
 
 
@@ -69,10 +68,6 @@ init _ =
 query : SelectionSet (Maybe Page) RootQuery
 query =
     Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 100 }) pageSelection
-
-
-
--- try add second optional argument for enum to `SORT_DESC`'
 
 
 pageSelection : SelectionSet Page AniList.Object.Page
@@ -154,7 +149,11 @@ view model =
                 RemoteData.Success response ->
                     case response of
                         Just page ->
-                            displayMangaList (sanitizeMangaList page.manga)
+                            div []
+                                [ siteTitle
+                                , displayMangaList
+                                    (sanitizeMangaList page.manga)
+                                ]
 
                         Nothing ->
                             text "No genres found."
@@ -172,14 +171,24 @@ main =
         }
 
 
+
+-- Fix baseLayout so that the siteTitle is above the children...
+
+
 baseLayout : Html Msg -> Html Msg
 baseLayout children =
-    div [ class "flex justify-center h-100vh bg-gray-100 mt-6" ] [ children ]
+    div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
+        [ children ]
+
+
+siteTitle : Html Msg
+siteTitle =
+    h1 [ class "text-center mt-2 text-2xl filter drop-shadow-md font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "ELMANGA" ]
 
 
 loadingSpinner : Html Msg
 loadingSpinner =
-    div []
+    div [ class "flex items-center h-full" ]
         [ Loading.render
             Circle
             { defaultConfig | color = "#333" }
@@ -189,7 +198,7 @@ loadingSpinner =
 
 displayMangaList : List Manga -> Html Msg
 displayMangaList mangaList =
-    div [ class "p-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5" ]
+    div [ class "px-16 pt-8 pb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5" ]
         (List.map displayManga mangaList)
 
 
@@ -200,12 +209,12 @@ displayMangaList mangaList =
 displayManga : Manga -> Html Msg
 displayManga manga =
     a [ href ("https://anilist.co/manga/" ++ String.fromInt manga.id) ]
-        [ div [ class "w-48 h-96 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:shadow-2xl hover:text-indigo-900" ]
+        [ div [ class "w-48 h-80 text-center text-gray-700 bg-white rounded overflow-hidden shadow-2xl hover:text-indigo-900" ]
             [ img [ src (sanitizeCoverImage manga.coverImage), class "h-72 w-full" ]
                 []
             , div
                 []
-                [ p [ class "text-l font-bold truncate mt-1 " ] [ text (sanitizeTitle manga.title) ]
+                [ p [ class "text-l font-bold truncate m-2 " ] [ text (sanitizeTitle manga.title) ]
                 ]
             , displayGenres (sanitizeGenres manga.genres)
             ]
@@ -231,16 +240,6 @@ sanitizeMangaList mangaList =
             []
 
 
-sanitizeGenres : Maybe (List (Maybe String)) -> List String
-sanitizeGenres genreList =
-    case genreList of
-        Just list ->
-            List.filterMap identity list
-
-        Nothing ->
-            []
-
-
 sanitizeTitle : Maybe Title -> String
 sanitizeTitle title =
     case title of
@@ -259,6 +258,16 @@ sanitizeCoverImage image =
 
         Nothing ->
             "No image found"
+
+
+sanitizeGenres : Maybe (List (Maybe String)) -> List String
+sanitizeGenres genreList =
+    case genreList of
+        Just list ->
+            List.filterMap identity list
+
+        Nothing ->
+            []
 
 
 sanitizeAverageScore : Maybe Int -> String
