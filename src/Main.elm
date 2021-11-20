@@ -1,9 +1,5 @@
 module Main exposing (..)
 
--- import AniList.Enum.MediaType
--- import Graphql.Document as Document
--- import Graphql.Http.GraphqlError
-
 import AniList.Enum.MediaType
 import AniList.Object
 import AniList.Object.Media as Media
@@ -52,7 +48,7 @@ type alias Page =
 
 
 type alias Manga =
-    { id : Int, averageScore : Maybe Int, title : Maybe Title, coverImage : Maybe CoverImage }
+    { id : Int, averageScore : Maybe Int, title : Maybe Title, coverImage : Maybe CoverImage, genres : Maybe Genres }
 
 
 type alias Title =
@@ -63,6 +59,10 @@ type alias CoverImage =
     { large : Maybe String }
 
 
+type alias Genres =
+    List (Maybe String)
+
+
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( RemoteData.Loading, makeRequest )
@@ -70,7 +70,7 @@ init _ =
 
 query : SelectionSet (Maybe Page) RootQuery
 query =
-    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 8 }) pageSelection
+    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 30 }) pageSelection
 
 
 
@@ -84,11 +84,12 @@ pageSelection =
 
 mediaSelection : SelectionSet Manga AniList.Object.Media
 mediaSelection =
-    SelectionSet.map4 Manga
+    SelectionSet.map5 Manga
         Media.id
         Media.averageScore
         (Media.title titleSelection)
         (Media.coverImage coverImageSelection)
+        Media.genres
 
 
 titleSelection : SelectionSet Title AniList.Object.MediaTitle
@@ -172,7 +173,7 @@ main =
 
 baseLayout : Html Msg -> Html Msg
 baseLayout children =
-    div [ class "flex justify-center h-full bg-grey-100 mt-6" ] [ children ]
+    div [ class "flex justify-center h-100vh bg-gray-100 mt-6" ] [ children ]
 
 
 loadingSpinner : Html Msg
@@ -187,19 +188,20 @@ loadingSpinner =
 
 displayMangaList : List Manga -> Html Msg
 displayMangaList mangaList =
-    div [ class "p-16 grid grid-cols-1 sm:grid-cols-1 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 gap-5" ]
+    div [ class "p-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5" ]
         (List.map displayManga mangaList)
 
 
 displayManga : Manga -> Html Msg
 displayManga manga =
-    div [ class "w-48 h-100 rounded overflow-hidden shadow-lg" ]
-        [ img [ src (sanitizeCoverImage manga.coverImage), class "max-w-full" ]
+    div [ class "w-48 h-80 text-center text-gray-800 bg-white rounded overflow-hidden shadow-lg hover:shadow-2xl" ]
+        [ img [ src (sanitizeCoverImage manga.coverImage), class "h-72 w-full" ]
             []
         , div
             []
-            [ p [ class "text-l font-bold truncate " ] [ text (sanitizeTitle manga.title) ]
-            , p [ class "text-m px-2 pt-2 pb-2 text-gray-700" ] [ text ("Score: " ++ sanitizeAverageScore manga.averageScore ++ "/100") ]
+            [ p [ class "text-l font-bold truncate mt-1 " ] [ text (sanitizeTitle manga.title) ]
+
+            -- , p [ class "text-m px-2 pt-2 pb-2 text-gray-700" ] [ text ("Score: " ++ sanitizeAverageScore manga.averageScore ++ "/100") ]
             ]
         ]
 
