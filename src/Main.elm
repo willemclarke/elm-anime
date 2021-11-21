@@ -151,7 +151,7 @@ view model =
                         Just page ->
                             div []
                                 [ siteTitle
-                                , filters
+                                , filters model
                                 , displayMangaList
                                     (sanitizeMangaList page.manga)
                                 ]
@@ -200,18 +200,18 @@ siteTitle =
     h1 [ class "text-center mt-2 text-3xl 2xl:text-4xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
 
 
-filters : Html Msg
-filters =
-    div [ class "flex justify-start mt-10 mx-16" ] [ searchFilter ]
+filters : Model -> Html Msg
+filters model =
+    div [ class "flex justify-start mt-10 mx-16" ] [ searchFilter model ]
 
 
-searchFilter : Html Msg
-searchFilter =
+searchFilter : Model -> Html Msg
+searchFilter model =
     div []
         [ div [ class "text-gray-700 " ] [ text "Search" ]
         , div []
             [ form [ onSubmit Refetch ]
-                [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] []
+                [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] [ text model.searchTerm ]
                 ]
             ]
         ]
