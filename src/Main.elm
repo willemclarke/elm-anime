@@ -14,8 +14,7 @@ import Graphql.Operation exposing (RootQuery)
 import Graphql.OptionalArgument exposing (..)
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
-import Html.Attributes exposing (class, height, href, placeholder, src, style, type_, value, width)
-import Html.Events exposing (onMouseOver)
+import Html.Attributes exposing (class, href, placeholder, src, type_)
 import Loading
     exposing
         ( LoaderType(..)
@@ -29,11 +28,6 @@ import RemoteData exposing (RemoteData)
 
 
 ---- MODEL ----
-
-
-type Msg
-    = GotResponse Model
-    | ShowExtraInfo
 
 
 type alias Model =
@@ -109,23 +103,15 @@ makeRequest =
 ---- UPDATE ----
 
 
+type Msg
+    = GotResponse Model
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         GotResponse response ->
             ( response, Cmd.none )
-
-        ShowExtraInfo ->
-            ( model, Cmd.none )
-
-
-
----- SUBSCRIPTIONS ----
-
-
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
 
 
 
@@ -162,6 +148,19 @@ view model =
     baseLayout children
 
 
+
+---- SUBSCRIPTIONS ----
+
+
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    Sub.none
+
+
+
+--- MAIN ----
+
+
 main : Program () Model Msg
 main =
     Browser.element
@@ -173,7 +172,7 @@ main =
 
 
 
--- Fix baseLayout so that the siteTitle is above the children...
+-- VIEW FUNCTIONS
 
 
 baseLayout : Html Msg -> Html Msg
@@ -218,10 +217,6 @@ displayMangaList mangaList =
         (List.map displayManga mangaList)
 
 
-
--- best card height = h-80, for now using h-96, revert eventually
-
-
 displayManga : Manga -> Html Msg
 displayManga manga =
     a [ href ("https://anilist.co/manga/" ++ String.fromInt manga.id) ]
@@ -248,6 +243,10 @@ displayGenres genres =
             (\genre -> span [ class "inline-block bg-blue-200 rounded-full px-2 text-xs font-semibold text-gray-700 mr-1 mb-1" ] [ text genre ])
             firstTwoGenres
         )
+
+
+
+-- API helpers, predominately dealing with `Maybes`
 
 
 sanitizeMangaList : Maybe (List (Maybe Manga)) -> List Manga
