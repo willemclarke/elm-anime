@@ -9,6 +9,7 @@ import AniList.Object.MediaTitle as MediaTitle
 import AniList.Object.Page as Page
 import AniList.Query as Query
 import Browser
+import Browser.Navigation as Nav
 import Graphql.Http
 import Graphql.Operation exposing (RootQuery)
 import Graphql.OptionalArgument exposing (..)
@@ -25,6 +26,7 @@ import Loading
 import Maybe exposing (withDefault)
 import Maybe.Extra exposing (or)
 import RemoteData exposing (RemoteData)
+import Url
 
 
 
@@ -32,7 +34,7 @@ import RemoteData exposing (RemoteData)
 
 
 type alias Model =
-    { data : RemoteData (Graphql.Http.Error Response) Response, searchTerm : String }
+    { data : RemoteData (Graphql.Http.Error Response) Response, searchTerm : String, key : Nav.Key, url : Url.Url }
 
 
 type alias Response =
@@ -55,9 +57,9 @@ type alias CoverImage =
     { large : Maybe String }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( { data = RemoteData.Loading, searchTerm = "" }, makeRequest Nothing )
+init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init flags url key =
+    ( { data = RemoteData.Loading, searchTerm = "", key = key, url = url }, makeRequest Nothing )
 
 
 
@@ -113,6 +115,8 @@ type Msg
     = GotResponse (RemoteData (Graphql.Http.Error Response) Response)
     | ChangeInput String
     | Refetch
+    | LinkClicked Browser.UrlRequest
+    | UrlChanged Url.Url
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -127,12 +131,24 @@ update msg model =
         Refetch ->
             ( { model | data = RemoteData.Loading }, makeRequest (Just model.searchTerm) )
 
+        LinkClicked urlRequest ->
+            case urlRequest of
+                Browser.Internal url ->
+                    ( model, Nav.pushUrl model.key (Url.toString url) )
+
+                Browser.External href ->
+                    ( model, Nav.load href )
+
+        UrlChanged url ->
+            ( { model | url = url }, Cmd.none )
+
 
 
 ---- VIEW ----
+--TODO: FIX view, needs to now have {title, body}
 
 
-view : Model -> Html Msg
+view : Model -> Browser.Document Msg
 view model =
     let
         children =
@@ -141,10 +157,10 @@ view model =
                     loadingSpinner
 
                 RemoteData.NotAsked ->
-                    text "not asked is true"
+                    text "Not asked"
 
                 RemoteData.Failure _ ->
-                    text "unable to fetch genres"
+                    text "Unable to fetch mangas"
 
                 RemoteData.Success response ->
                     case response of
@@ -157,7 +173,7 @@ view model =
                                 ]
 
                         Nothing ->
-                            text "No genres found."
+                            text "No manga's found."
     in
     baseLayout children
 
@@ -177,11 +193,13 @@ subscriptions _ =
 
 main : Program () Model Msg
 main =
-    Browser.element
+    Browser.application
         { view = view
         , init = init
         , update = update
         , subscriptions = always Sub.none
+        , onUrlChange = UrlChanged
+        , onUrlRequest = LinkClicked
         }
 
 
@@ -208,7 +226,7 @@ filters model =
 searchFilter : Model -> Html Msg
 searchFilter model =
     div []
-        [ div [ class "text-gray-700 " ] [ text "Search" ]
+        [ div [ class "text-gray-700 font-bold" ] [ text "Search" ]
         , div []
             [ form [ onSubmit Refetch ]
                 [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] [ text model.searchTerm ]
@@ -260,6 +278,10 @@ displayGenres genres =
     else
         div [ class "mx-2" ]
             (List.map (\genre -> span [ class "inline-block bg-blue-200 rounded-full px-2 text-xs font-semibold text-gray-700 mr-1 mb-1" ] [ text genre ]) firstTwoGenres)
+
+
+
+-- Gql helper functions, predominately dealing with the Maybe type which the schema is rife with
 
 
 sanitizeMangaList : Maybe (List (Maybe Manga)) -> List Manga
