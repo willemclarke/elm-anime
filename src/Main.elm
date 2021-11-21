@@ -14,8 +14,8 @@ import Graphql.Operation exposing (RootQuery)
 import Graphql.OptionalArgument exposing (..)
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
-import Html.Attributes exposing (class, height, href, placeholder, src, style, type_, value, width)
-import Html.Events exposing (onMouseOver)
+import Html.Attributes exposing (class, href, placeholder, src, type_)
+import Html.Events exposing (onInput, onSubmit)
 import Loading
     exposing
         ( LoaderType(..)
@@ -31,13 +31,8 @@ import RemoteData exposing (RemoteData)
 ---- MODEL ----
 
 
-type Msg
-    = GotResponse Model
-    | ShowExtraInfo
-
-
 type alias Model =
-    RemoteData (Graphql.Http.Error Response) Response
+    { data : RemoteData (Graphql.Http.Error Response) Response, searchTerm : String }
 
 
 type alias Response =
@@ -62,17 +57,21 @@ type alias CoverImage =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( RemoteData.Loading, makeRequest )
+    ( { data = RemoteData.Loading, searchTerm = "" }, makeRequest Nothing )
 
 
-query : SelectionSet (Maybe Page) RootQuery
-query =
-    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 100 }) pageSelection
+
+-- Gql API related functions
 
 
-pageSelection : SelectionSet Page AniList.Object.Page
-pageSelection =
-    SelectionSet.map Page (Page.media (\optionals -> { optionals | type_ = Present AniList.Enum.MediaType.Manga, sort = Present [ Just AniList.Enum.MediaSort.ScoreDesc ] }) mediaSelection)
+query : Maybe String -> SelectionSet (Maybe Page) RootQuery
+query searchTerm =
+    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 100 }) (pageSelection searchTerm)
+
+
+pageSelection : Maybe String -> SelectionSet Page AniList.Object.Page
+pageSelection searchTerm =
+    SelectionSet.map Page (Page.media (\optionals -> { optionals | type_ = Present AniList.Enum.MediaType.Manga, sort = Present [ Just AniList.Enum.MediaSort.ScoreDesc ], isAdult = Present False, search = fromMaybe searchTerm }) mediaSelection)
 
 
 mediaSelection : SelectionSet Manga AniList.Object.Media
@@ -98,9 +97,10 @@ coverImageSelection =
         CoverImage.large
 
 
-makeRequest : Cmd Msg
-makeRequest =
-    query
+makeRequest : Maybe String -> Cmd Msg
+makeRequest searchTerm =
+    searchTerm
+        |> query
         |> Graphql.Http.queryRequest "https://graphql.anilist.co/"
         |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
 
@@ -109,23 +109,23 @@ makeRequest =
 ---- UPDATE ----
 
 
+type Msg
+    = GotResponse (RemoteData (Graphql.Http.Error Response) Response)
+    | ChangeInput String
+    | Refetch
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         GotResponse response ->
-            ( response, Cmd.none )
+            ( { model | data = response }, Cmd.none )
 
-        ShowExtraInfo ->
-            ( model, Cmd.none )
+        ChangeInput newInput ->
+            ( { model | searchTerm = newInput }, Cmd.none )
 
-
-
----- SUBSCRIPTIONS ----
-
-
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
+        Refetch ->
+            ( { model | data = RemoteData.Loading }, makeRequest (Just model.searchTerm) )
 
 
 
@@ -136,7 +136,7 @@ view : Model -> Html Msg
 view model =
     let
         children =
-            case model of
+            case model.data of
                 RemoteData.Loading ->
                     loadingSpinner
 
@@ -151,7 +151,7 @@ view model =
                         Just page ->
                             div []
                                 [ siteTitle
-                                , filters
+                                , filters model
                                 , displayMangaList
                                     (sanitizeMangaList page.manga)
                                 ]
@@ -160,6 +160,19 @@ view model =
                             text "No genres found."
     in
     baseLayout children
+
+
+
+---- SUBSCRIPTIONS ----
+
+
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    Sub.none
+
+
+
+--- MAIN ----
 
 
 main : Program () Model Msg
@@ -173,7 +186,7 @@ main =
 
 
 
--- Fix baseLayout so that the siteTitle is above the children...
+-- View functions
 
 
 baseLayout : Html Msg -> Html Msg
@@ -184,20 +197,22 @@ baseLayout children =
 
 siteTitle : Html Msg
 siteTitle =
-    h1 [ class "text-center mt-2 text-2xl filter drop-shadow-md font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "ELMANGA" ]
+    h1 [ class "text-center mt-2 text-3xl 2xl:text-4xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
 
 
-filters : Html Msg
-filters =
-    div [ class "flex justify-start mt-10 mx-16" ] [ searchFilter ]
+filters : Model -> Html Msg
+filters model =
+    div [ class "flex justify-start mt-10 mx-16" ] [ searchFilter model ]
 
 
-searchFilter : Html Msg
-searchFilter =
+searchFilter : Model -> Html Msg
+searchFilter model =
     div []
         [ div [ class "text-gray-700 " ] [ text "Search" ]
         , div []
-            [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search" ] []
+            [ form [ onSubmit Refetch ]
+                [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] [ text model.searchTerm ]
+                ]
             ]
         ]
 
@@ -214,23 +229,19 @@ loadingSpinner =
 
 displayMangaList : List Manga -> Html Msg
 displayMangaList mangaList =
-    div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5" ]
+    div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6" ]
         (List.map displayManga mangaList)
-
-
-
--- best card height = h-80, for now using h-96, revert eventually
 
 
 displayManga : Manga -> Html Msg
 displayManga manga =
     a [ href ("https://anilist.co/manga/" ++ String.fromInt manga.id) ]
-        [ div [ class "w-48 h-80 text-center text-gray-700 bg-white rounded overflow-hidden shadow-2xl hover:text-indigo-900" ]
+        [ div [ class "w-48 h-80 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:text-indigo-900 hover:shadow-2xl" ]
             [ img [ src (sanitizeCoverImage manga.coverImage), class "h-64 w-full" ]
                 []
             , div
                 []
-                [ p [ class "text-l font-bold truncate mx-2 mt-1 mb-1 " ] [ text (sanitizeTitle manga.title) ]
+                [ p [ class "text-l font-bold hover:font-black truncate mx-2 mt-1 mb-1" ] [ text (sanitizeTitle manga.title) ]
                 , displayGenres (sanitizeGenres manga.genres)
                 ]
             ]
@@ -243,11 +254,12 @@ displayGenres genres =
         firstTwoGenres =
             List.take 2 genres
     in
-    div [ class "mx-2" ]
-        (List.map
-            (\genre -> span [ class "inline-block bg-blue-200 rounded-full px-2 text-xs font-semibold text-gray-700 mr-1 mb-1" ] [ text genre ])
-            firstTwoGenres
-        )
+    if List.length firstTwoGenres /= 2 then
+        span [ class "px-2 text-md font-semibold text-gray-700 mr-1 mb-1" ] [ text "No genres" ]
+
+    else
+        div [ class "mx-2" ]
+            (List.map (\genre -> span [ class "inline-block bg-blue-200 rounded-full px-2 text-xs font-semibold text-gray-700 mr-1 mb-1" ] [ text genre ]) firstTwoGenres)
 
 
 sanitizeMangaList : Maybe (List (Maybe Manga)) -> List Manga
