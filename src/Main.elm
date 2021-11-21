@@ -15,6 +15,7 @@ import Graphql.OptionalArgument exposing (..)
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
 import Html.Attributes exposing (class, href, placeholder, src, type_)
+import Html.Events exposing (onInput, onSubmit)
 import Loading
     exposing
         ( LoaderType(..)
@@ -56,21 +57,21 @@ type alias CoverImage =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( { data = RemoteData.Loading, searchTerm = "" }, makeRequest )
+    ( { data = RemoteData.Loading, searchTerm = "" }, makeRequest Nothing )
 
 
 
 -- Gql API related functions
 
 
-query : SelectionSet (Maybe Page) RootQuery
-query =
-    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 100 }) pageSelection
+query : Maybe String -> SelectionSet (Maybe Page) RootQuery
+query searchTerm =
+    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 100 }) (pageSelection searchTerm)
 
 
-pageSelection : SelectionSet Page AniList.Object.Page
-pageSelection =
-    SelectionSet.map Page (Page.media (\optionals -> { optionals | type_ = Present AniList.Enum.MediaType.Manga, sort = Present [ Just AniList.Enum.MediaSort.ScoreDesc ] }) mediaSelection)
+pageSelection : Maybe String -> SelectionSet Page AniList.Object.Page
+pageSelection searchTerm =
+    SelectionSet.map Page (Page.media (\optionals -> { optionals | type_ = Present AniList.Enum.MediaType.Manga, sort = Present [ Just AniList.Enum.MediaSort.ScoreDesc ], isAdult = Present False, search = fromMaybe searchTerm }) mediaSelection)
 
 
 mediaSelection : SelectionSet Manga AniList.Object.Media
@@ -96,9 +97,10 @@ coverImageSelection =
         CoverImage.large
 
 
-makeRequest : Cmd Msg
-makeRequest =
-    query
+makeRequest : Maybe String -> Cmd Msg
+makeRequest searchTerm =
+    searchTerm
+        |> query
         |> Graphql.Http.queryRequest "https://graphql.anilist.co/"
         |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
 
@@ -108,14 +110,22 @@ makeRequest =
 
 
 type Msg
-    = GotResponse Model
+    = GotResponse (RemoteData (Graphql.Http.Error Response) Response)
+    | ChangeInput String
+    | Refetch
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         GotResponse response ->
-            ( { model | data = response.data }, Cmd.none )
+            ( { model | data = response }, Cmd.none )
+
+        ChangeInput newInput ->
+            ( { model | searchTerm = newInput }, Cmd.none )
+
+        Refetch ->
+            ( { model | data = RemoteData.Loading }, makeRequest (Just model.searchTerm) )
 
 
 
@@ -176,7 +186,7 @@ main =
 
 
 
--- VIEW FUNCTIONS
+-- View functions
 
 
 baseLayout : Html Msg -> Html Msg
@@ -200,7 +210,9 @@ searchFilter =
     div []
         [ div [ class "text-gray-700 " ] [ text "Search" ]
         , div []
-            [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search" ] []
+            [ form [ onSubmit Refetch ]
+                [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] []
+                ]
             ]
         ]
 
@@ -224,12 +236,12 @@ displayMangaList mangaList =
 displayManga : Manga -> Html Msg
 displayManga manga =
     a [ href ("https://anilist.co/manga/" ++ String.fromInt manga.id) ]
-        [ div [ class "w-48 h-80 text-center text-gray-700 bg-white rounded overflow-hidden shadow-2xl hover:text-indigo-900" ]
+        [ div [ class "w-48 h-80 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:text-indigo-900 hover:shadow-2xl" ]
             [ img [ src (sanitizeCoverImage manga.coverImage), class "h-64 w-full" ]
                 []
             , div
                 []
-                [ p [ class "text-l font-bold truncate mx-2 mt-1 mb-1 " ] [ text (sanitizeTitle manga.title) ]
+                [ p [ class "text-l font-bold hover:font-black truncate mx-2 mt-1 mb-1" ] [ text (sanitizeTitle manga.title) ]
                 , displayGenres (sanitizeGenres manga.genres)
                 ]
             ]
