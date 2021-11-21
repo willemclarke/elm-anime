@@ -254,15 +254,12 @@ displayGenres genres =
         firstTwoGenres =
             List.take 2 genres
     in
-    div [ class "mx-2" ]
-        (List.map
-            (\genre -> span [ class "inline-block bg-blue-200 rounded-full px-2 text-xs font-semibold text-gray-700 mr-1 mb-1" ] [ text genre ])
-            firstTwoGenres
-        )
+    if List.length firstTwoGenres /= 2 then
+        span [ class "px-2 text-md font-semibold text-gray-700 mr-1 mb-1" ] [ text "No genres" ]
 
-
-
--- API helpers, predominately dealing with `Maybes`
+    else
+        div [ class "mx-2" ]
+            (List.map (\genre -> span [ class "inline-block bg-blue-200 rounded-full px-2 text-xs font-semibold text-gray-700 mr-1 mb-1" ] [ text genre ]) firstTwoGenres)
 
 
 sanitizeMangaList : Maybe (List (Maybe Manga)) -> List Manga
