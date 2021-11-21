@@ -31,7 +31,7 @@ import RemoteData exposing (RemoteData)
 
 
 type alias Model =
-    RemoteData (Graphql.Http.Error Response) Response
+    { data : RemoteData (Graphql.Http.Error Response) Response, searchTerm : String }
 
 
 type alias Response =
@@ -56,7 +56,11 @@ type alias CoverImage =
 
 init : () -> ( Model, Cmd Msg )
 init _ =
-    ( RemoteData.Loading, makeRequest )
+    ( { data = RemoteData.Loading, searchTerm = "" }, makeRequest )
+
+
+
+-- Gql API related functions
 
 
 query : SelectionSet (Maybe Page) RootQuery
@@ -111,7 +115,7 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         GotResponse response ->
-            ( response, Cmd.none )
+            ( { model | data = response.data }, Cmd.none )
 
 
 
@@ -122,7 +126,7 @@ view : Model -> Html Msg
 view model =
     let
         children =
-            case model of
+            case model.data of
                 RemoteData.Loading ->
                     loadingSpinner
 
@@ -183,7 +187,7 @@ baseLayout children =
 
 siteTitle : Html Msg
 siteTitle =
-    h1 [ class "text-center mt-2 text-2xl filter drop-shadow-md font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "ELMANGA" ]
+    h1 [ class "text-center mt-2 text-3xl 2xl:text-4xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
 
 
 filters : Html Msg
@@ -213,7 +217,7 @@ loadingSpinner =
 
 displayMangaList : List Manga -> Html Msg
 displayMangaList mangaList =
-    div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-5" ]
+    div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6" ]
         (List.map displayManga mangaList)
 
 
