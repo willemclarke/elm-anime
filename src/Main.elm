@@ -1,7 +1,5 @@
 module Main exposing (..)
 
--- import Maybe exposing (withDefault)
-
 import AniList.Enum.MediaSort
 import AniList.Enum.MediaType
 import AniList.Object
@@ -18,7 +16,7 @@ import Graphql.OptionalArgument exposing (..)
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
 import Html.Attributes exposing (class, href, placeholder, src, type_)
-import Html.Events exposing (onInput, onSubmit)
+import Html.Events exposing (on, onInput, onSubmit)
 import Loading
     exposing
         ( LoaderType(..)
@@ -26,7 +24,8 @@ import Loading
         )
 import Maybe.Extra exposing (or)
 import RemoteData exposing (RemoteData)
-import Url
+import Url exposing (..)
+import Url.Builder exposing (Root(..))
 
 
 
@@ -133,6 +132,7 @@ type Msg
     | Refetch
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
+    | FormSubmit
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -157,6 +157,16 @@ update msg model =
 
         UrlChanged url ->
             ( { model | url = url }, Cmd.none )
+
+        FormSubmit ->
+            ( model, Cmd.batch (onSubmitCommands model) )
+
+
+onSubmitCommands : Model -> List (Cmd Msg)
+onSubmitCommands model =
+    [ makeRequest (Just model.searchTerm)
+    , Nav.pushUrl model.key <| Url.Builder.relative [] [ Url.Builder.string "search" model.searchTerm ]
+    ]
 
 
 
@@ -231,7 +241,7 @@ searchFilter model =
     div []
         [ div [ class "text-gray-700 font-bold" ] [ text "Search" ]
         , div []
-            [ form [ onSubmit (LinkClicked model.searchTerm) ]
+            [ form [ onSubmit FormSubmit ]
                 [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] [ text model.searchTerm ]
                 ]
             ]
