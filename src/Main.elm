@@ -8,23 +8,40 @@ import AniList.Object.MediaCoverImage as CoverImage
 import AniList.Object.MediaTitle as MediaTitle
 import AniList.Object.Page as Page
 import AniList.Query as Query
-import Browser
+import Browser exposing (UrlRequest(..))
+import Browser.Navigation as Nav
 import Graphql.Http
 import Graphql.Operation exposing (RootQuery)
 import Graphql.OptionalArgument exposing (..)
 import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
 import Html.Attributes exposing (class, href, placeholder, src, type_)
-import Html.Events exposing (onInput, onSubmit)
+import Html.Events exposing (on, onInput, onSubmit)
 import Loading
     exposing
         ( LoaderType(..)
         , defaultConfig
-        , render
         )
-import Maybe exposing (withDefault)
 import Maybe.Extra exposing (or)
 import RemoteData exposing (RemoteData)
+import Url exposing (..)
+import Url.Builder exposing (Root(..))
+
+
+
+--- MAIN ----
+
+
+main : Program () Model Msg
+main =
+    Browser.application
+        { view = view
+        , init = init
+        , update = update
+        , subscriptions = always Sub.none
+        , onUrlChange = UrlChanged
+        , onUrlRequest = LinkClicked
+        }
 
 
 
@@ -32,7 +49,7 @@ import RemoteData exposing (RemoteData)
 
 
 type alias Model =
-    { data : RemoteData (Graphql.Http.Error Response) Response, searchTerm : String }
+    { data : RemoteData (Graphql.Http.Error Response) Response, searchTerm : String, key : Nav.Key, url : Url.Url }
 
 
 type alias Response =
@@ -55,9 +72,9 @@ type alias CoverImage =
     { large : Maybe String }
 
 
-init : () -> ( Model, Cmd Msg )
-init _ =
-    ( { data = RemoteData.Loading, searchTerm = "" }, makeRequest Nothing )
+init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+init flags url key =
+    ( { data = RemoteData.Loading, searchTerm = "", key = key, url = url }, makeRequest Nothing )
 
 
 
@@ -113,6 +130,9 @@ type Msg
     = GotResponse (RemoteData (Graphql.Http.Error Response) Response)
     | ChangeInput String
     | Refetch
+    | LinkClicked Browser.UrlRequest
+    | UrlChanged Url.Url
+    | FormSubmit
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -127,39 +147,26 @@ update msg model =
         Refetch ->
             ( { model | data = RemoteData.Loading }, makeRequest (Just model.searchTerm) )
 
+        LinkClicked urlRequest ->
+            case urlRequest of
+                Browser.Internal url ->
+                    ( model, Nav.pushUrl model.key <| Url.toString url )
+
+                Browser.External href ->
+                    ( model, Nav.load href )
+
+        UrlChanged url ->
+            ( { model | url = url }, Cmd.none )
+
+        FormSubmit ->
+            ( model, Cmd.batch (onSubmitCommands model) )
 
 
----- VIEW ----
-
-
-view : Model -> Html Msg
-view model =
-    let
-        children =
-            case model.data of
-                RemoteData.Loading ->
-                    loadingSpinner
-
-                RemoteData.NotAsked ->
-                    text "not asked is true"
-
-                RemoteData.Failure _ ->
-                    text "unable to fetch genres"
-
-                RemoteData.Success response ->
-                    case response of
-                        Just page ->
-                            div []
-                                [ siteTitle
-                                , filters model
-                                , displayMangaList
-                                    (sanitizeMangaList page.manga)
-                                ]
-
-                        Nothing ->
-                            text "No genres found."
-    in
-    baseLayout children
+onSubmitCommands : Model -> List (Cmd Msg)
+onSubmitCommands model =
+    [ makeRequest (Just model.searchTerm)
+    , Nav.pushUrl model.key <| Url.Builder.relative [] [ Url.Builder.string "search" model.searchTerm ]
+    ]
 
 
 
@@ -172,27 +179,51 @@ subscriptions _ =
 
 
 
---- MAIN ----
+---- VIEW ----
 
 
-main : Program () Model Msg
-main =
-    Browser.element
-        { view = view
-        , init = init
-        , update = update
-        , subscriptions = always Sub.none
-        }
+view : Model -> Browser.Document Msg
+view model =
+    let
+        children =
+            case model.data of
+                RemoteData.Loading ->
+                    loadingSpinner
+
+                RemoteData.NotAsked ->
+                    text "Not asked"
+
+                RemoteData.Failure _ ->
+                    text "Unable to fetch mangas"
+
+                RemoteData.Success response ->
+                    case response of
+                        Just page ->
+                            div []
+                                [ siteTitle
+                                , filters model
+                                , displayMangaList
+                                    (sanitizeMangaList page.manga)
+                                ]
+
+                        Nothing ->
+                            text "No manga's found."
+    in
+    baseLayout children
 
 
 
 -- View functions
 
 
-baseLayout : Html Msg -> Html Msg
+baseLayout : Html Msg -> Browser.Document Msg
 baseLayout children =
-    div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
-        [ children ]
+    { title = "elm-manga"
+    , body =
+        [ div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
+            [ children ]
+        ]
+    }
 
 
 siteTitle : Html Msg
@@ -208,9 +239,9 @@ filters model =
 searchFilter : Model -> Html Msg
 searchFilter model =
     div []
-        [ div [ class "text-gray-700 " ] [ text "Search" ]
+        [ div [ class "text-gray-700 font-bold" ] [ text "Search" ]
         , div []
-            [ form [ onSubmit Refetch ]
+            [ form [ onSubmit FormSubmit ]
                 [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] [ text model.searchTerm ]
                 ]
             ]
@@ -260,6 +291,10 @@ displayGenres genres =
     else
         div [ class "mx-2" ]
             (List.map (\genre -> span [ class "inline-block bg-blue-200 rounded-full px-2 text-xs font-semibold text-gray-700 mr-1 mb-1" ] [ text genre ]) firstTwoGenres)
+
+
+
+-- Gql helper functions, predominately dealing with the Maybe type which the schema is rife with
 
 
 sanitizeMangaList : Maybe (List (Maybe Manga)) -> List Manga
