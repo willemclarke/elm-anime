@@ -30,6 +30,22 @@ import Url
 
 
 
+--- MAIN ----
+
+
+main : Program () Model Msg
+main =
+    Browser.application
+        { view = view
+        , init = init
+        , update = update
+        , subscriptions = always Sub.none
+        , onUrlChange = UrlChanged
+        , onUrlRequest = LinkClicked
+        }
+
+
+
 ---- MODEL ----
 
 
@@ -144,8 +160,16 @@ update msg model =
 
 
 
+---- SUBSCRIPTIONS ----
+
+
+subscriptions : Model -> Sub Msg
+subscriptions _ =
+    Sub.none
+
+
+
 ---- VIEW ----
---TODO: FIX view, needs to now have {title, body}
 
 
 view : Model -> Browser.Document Msg
@@ -179,38 +203,17 @@ view model =
 
 
 
----- SUBSCRIPTIONS ----
-
-
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
-
-
-
---- MAIN ----
-
-
-main : Program () Model Msg
-main =
-    Browser.application
-        { view = view
-        , init = init
-        , update = update
-        , subscriptions = always Sub.none
-        , onUrlChange = UrlChanged
-        , onUrlRequest = LinkClicked
-        }
-
-
-
 -- View functions
 
 
-baseLayout : Html Msg -> Html Msg
+baseLayout : Html Msg -> Browser.Document Msg
 baseLayout children =
-    div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
-        [ children ]
+    { title = "elm-manga"
+    , body =
+        [ div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
+            [ children ]
+        ]
+    }
 
 
 siteTitle : Html Msg
