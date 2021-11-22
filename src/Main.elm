@@ -1,5 +1,7 @@
 module Main exposing (..)
 
+-- import Maybe exposing (withDefault)
+
 import AniList.Enum.MediaSort
 import AniList.Enum.MediaType
 import AniList.Object
@@ -8,7 +10,7 @@ import AniList.Object.MediaCoverImage as CoverImage
 import AniList.Object.MediaTitle as MediaTitle
 import AniList.Object.Page as Page
 import AniList.Query as Query
-import Browser
+import Browser exposing (UrlRequest(..))
 import Browser.Navigation as Nav
 import Graphql.Http
 import Graphql.Operation exposing (RootQuery)
@@ -21,9 +23,7 @@ import Loading
     exposing
         ( LoaderType(..)
         , defaultConfig
-        , render
         )
-import Maybe exposing (withDefault)
 import Maybe.Extra exposing (or)
 import RemoteData exposing (RemoteData)
 import Url
@@ -150,7 +150,7 @@ update msg model =
         LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
-                    ( model, Nav.pushUrl model.key (Url.toString url) )
+                    ( model, Nav.pushUrl model.key <| Url.toString url )
 
                 Browser.External href ->
                     ( model, Nav.load href )
@@ -231,7 +231,7 @@ searchFilter model =
     div []
         [ div [ class "text-gray-700 font-bold" ] [ text "Search" ]
         , div []
-            [ form [ onSubmit Refetch ]
+            [ form [ onSubmit (LinkClicked model.searchTerm) ]
                 [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] [ text model.searchTerm ]
                 ]
             ]
