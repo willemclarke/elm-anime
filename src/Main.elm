@@ -8,6 +8,7 @@ import AniList.Object.MediaCoverImage as CoverImage
 import AniList.Object.MediaTitle as MediaTitle
 import AniList.Object.Page as Page
 import AniList.Query as Query
+import Array exposing (set)
 import Browser exposing (UrlRequest(..))
 import Browser.Navigation as Nav
 import Graphql.Http
@@ -26,6 +27,8 @@ import Maybe.Extra exposing (or)
 import RemoteData exposing (RemoteData)
 import Url exposing (..)
 import Url.Builder exposing (Root(..))
+import Url.Parser exposing ((</>), (<?>))
+import Url.Parser.Query
 
 
 
@@ -49,7 +52,11 @@ main =
 
 
 type alias Model =
-    { data : RemoteData (Graphql.Http.Error Response) Response, searchTerm : String, key : Nav.Key, url : Url.Url }
+    { data : RemoteData (Graphql.Http.Error Response) Response, searchTerm : String, key : Nav.Key, url : Url.Url, route : Maybe Route }
+
+
+type Route
+    = Home (Maybe String)
 
 
 type alias Response =
@@ -73,8 +80,8 @@ type alias CoverImage =
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init flags url key =
-    ( { data = RemoteData.Loading, searchTerm = "", key = key, url = url }, makeRequest Nothing )
+init _ url key =
+    ( { data = RemoteData.Loading, searchTerm = "", key = key, url = url, route = Url.Parser.parse urlParser url }, makeRequest Nothing )
 
 
 
@@ -132,7 +139,6 @@ type Msg
     | Refetch
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
-    | FormSubmit
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -156,17 +162,13 @@ update msg model =
                     ( model, Nav.load href )
 
         UrlChanged url ->
-            ( { model | url = url }, Cmd.none )
-
-        FormSubmit ->
-            ( model, Cmd.batch (onSubmitCommands model) )
+            ( { model | url = url, route = Url.Parser.parse urlParser url }, Cmd.none )
 
 
-onSubmitCommands : Model -> List (Cmd Msg)
-onSubmitCommands model =
-    [ makeRequest (Just model.searchTerm)
-    , Nav.pushUrl model.key <| Url.Builder.relative [] [ Url.Builder.string "search" model.searchTerm ]
-    ]
+urlParser : Url.Parser.Parser (Route -> a) a
+urlParser =
+    Url.Parser.oneOf
+        [ Url.Parser.map Home <| Url.Parser.top <?> Url.Parser.Query.string "searchTerm" ]
 
 
 
@@ -209,7 +211,12 @@ view model =
                         Nothing ->
                             text "No manga's found."
     in
-    baseLayout children
+    case model.route of
+        Just (Home _) ->
+            baseLayout children
+
+        Nothing ->
+            { title = "elm-layout", body = [ div [] [ text "invalid route" ] ] }
 
 
 
@@ -241,7 +248,7 @@ searchFilter model =
     div []
         [ div [ class "text-gray-700 font-bold" ] [ text "Search" ]
         , div []
-            [ form [ onSubmit FormSubmit ]
+            [ form [ onSubmit Refetch ]
                 [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] [ text model.searchTerm ]
                 ]
             ]
