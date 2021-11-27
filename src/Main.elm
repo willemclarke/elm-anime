@@ -25,7 +25,9 @@ import Loading
         , defaultConfig
         )
 import Maybe.Extra exposing (or)
+import Process
 import RemoteData exposing (RemoteData)
+import Task
 import Url exposing (..)
 import Url.Builder exposing (Root(..))
 import Url.Parser exposing ((</>), (<?>))
@@ -53,7 +55,7 @@ main =
 
 
 type alias Model =
-    { data : RemoteData (Graphql.Http.Error Response) Response, searchTerm : String, key : Nav.Key, url : Url.Url, route : Maybe Route }
+    { data : RemoteData (Graphql.Http.Error Response) Response, key : Nav.Key, url : Url.Url, route : Maybe Route }
 
 
 type Route
@@ -83,7 +85,13 @@ type alias CoverImage =
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
-    ( { data = RemoteData.Loading, searchTerm = "", key = key, url = url, route = Just (fromUrl url) }, makeRequest Nothing )
+    ( { data = RemoteData.Loading, key = key, url = url, route = Just (fromUrl url) }, send (UrlChanged url) )
+
+
+send : msg -> Cmd msg
+send msg =
+    Task.succeed msg
+        |> Task.perform identity
 
 
 
@@ -138,10 +146,8 @@ makeRequest searchTerm =
 type Msg
     = GotResponse (RemoteData (Graphql.Http.Error Response) Response)
     | ChangeInput String
-    | Refetch
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
-    | SetUrl
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -151,10 +157,7 @@ update msg model =
             ( { model | data = response }, Cmd.none )
 
         ChangeInput newInput ->
-            ( { model | searchTerm = newInput }, Cmd.none )
-
-        Refetch ->
-            ( { model | data = RemoteData.Loading }, makeRequest (Just model.searchTerm) )
+            ( model, delay 2000 (setSearchQueryParam model.key newInput) )
 
         LinkClicked urlRequest ->
             case urlRequest of
@@ -165,15 +168,26 @@ update msg model =
                     ( model, Nav.load href )
 
         UrlChanged url ->
-            ( { model | url = url, route = Just (fromUrl url) }, makeRequest (Just model.searchTerm) )
+            let
+                route =
+                    fromUrl url
+            in
+            case route of
+                Home searchTerm ->
+                    ( { model | url = url, route = Just route }, makeRequest searchTerm )
 
-        SetUrl ->
-            ( model, setSearchQueryParam model.key model.searchTerm )
+                NotFound ->
+                    ( { model | url = url, route = Just route }, Cmd.none )
+
+
+delay : Float -> msg -> Cmd msg
+delay time msg =
+    Process.sleep time |> Task.andThen (always <| Task.succeed msg) |> Task.perform identity
 
 
 setSearchQueryParam : Nav.Key -> String -> Cmd Msg
 setSearchQueryParam key queryString =
-    Nav.pushUrl key <| Url.Builder.relative [ "/" ] [ Url.Builder.string "search" queryString ]
+    Nav.replaceUrl key <| Url.Builder.relative [ "/" ] [ Url.Builder.string "search" queryString ]
 
 
 fromUrl : Url.Url -> Route
@@ -203,7 +217,7 @@ subscriptions _ =
 view : Model -> Browser.Document Msg
 view model =
     let
-        children =
+        renderHomePage searchTerm =
             case model.data of
                 RemoteData.Loading ->
                     loadingSpinner
@@ -219,9 +233,9 @@ view model =
                         Just page ->
                             div []
                                 [ siteTitle
-                                , filters model
+                                , filters searchTerm
                                 , p [] [ text (Debug.toString (fromUrl model.url)) ]
-                                , p [] [ text (Debug.toString model.url.query) ]
+                                , p [] [ text (Debug.toString model.route) ]
                                 , displayMangaList
                                     (sanitizeMangaList page.manga)
                                 ]
@@ -230,11 +244,8 @@ view model =
                             text "No manga's found."
     in
     case model.route of
-        Just (Home (Just "search")) ->
-            baseLayout children
-
-        Just (Home _) ->
-            baseLayout children
+        Just (Home searchTerm) ->
+            baseLayout (renderHomePage searchTerm)
 
         Just NotFound ->
             { title = "elm-layout", body = [ div [] [ text "Invalid route" ] ] }
@@ -262,18 +273,18 @@ siteTitle =
     h1 [ class "text-center mt-2 text-3xl 2xl:text-4xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
 
 
-filters : Model -> Html Msg
-filters model =
-    div [ class "flex justify-start mt-10 mx-16" ] [ searchFilter model ]
+filters : Maybe String -> Html Msg
+filters searchTerm =
+    div [ class "flex justify-start mt-10 mx-16" ] [ searchFilter searchTerm ]
 
 
-searchFilter : Model -> Html Msg
-searchFilter model =
+searchFilter : Maybe String -> Html Msg
+searchFilter searchTerm =
     div []
         [ div [ class "text-gray-700 font-bold" ] [ text "Search" ]
         , div []
-            [ form [ onSubmit SetUrl ]
-                [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] [ text model.searchTerm ]
+            [ form []
+                [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] [ text (Maybe.withDefault "" searchTerm) ]
                 ]
             ]
         ]
