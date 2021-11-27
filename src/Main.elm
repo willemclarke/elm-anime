@@ -5,6 +5,7 @@ import AniList.Enum.MediaType
 import AniList.Object
 import AniList.Object.Media as Media
 import AniList.Object.MediaCoverImage as CoverImage
+import AniList.Object.MediaExternalLink exposing (url)
 import AniList.Object.MediaTitle as MediaTitle
 import AniList.Object.Page as Page
 import AniList.Query as Query
@@ -57,6 +58,7 @@ type alias Model =
 
 type Route
     = Home (Maybe String)
+    | NotFound
 
 
 type alias Response =
@@ -81,7 +83,7 @@ type alias CoverImage =
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
-    ( { data = RemoteData.Loading, searchTerm = "", key = key, url = url, route = Url.Parser.parse urlParser url }, makeRequest Nothing )
+    ( { data = RemoteData.Loading, searchTerm = "", key = key, url = url, route = Just (fromUrl url) }, makeRequest Nothing )
 
 
 
@@ -139,6 +141,7 @@ type Msg
     | Refetch
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
+    | SetUrl
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -162,13 +165,26 @@ update msg model =
                     ( model, Nav.load href )
 
         UrlChanged url ->
-            ( { model | url = url, route = Url.Parser.parse urlParser url }, Cmd.none )
+            ( { model | url = url, route = Just (fromUrl url) }, makeRequest (Just model.searchTerm) )
+
+        SetUrl ->
+            ( model, setSearchQueryParam model.key model.searchTerm )
+
+
+setSearchQueryParam : Nav.Key -> String -> Cmd Msg
+setSearchQueryParam key queryString =
+    Nav.pushUrl key <| Url.Builder.relative [ "/" ] [ Url.Builder.string "search" queryString ]
+
+
+fromUrl : Url.Url -> Route
+fromUrl url =
+    Maybe.withDefault NotFound (Url.Parser.parse urlParser url)
 
 
 urlParser : Url.Parser.Parser (Route -> a) a
 urlParser =
     Url.Parser.oneOf
-        [ Url.Parser.map Home <| Url.Parser.top <?> Url.Parser.Query.string "searchTerm" ]
+        [ Url.Parser.map Home <| Url.Parser.top <?> Url.Parser.Query.string "search" ]
 
 
 
@@ -204,6 +220,8 @@ view model =
                             div []
                                 [ siteTitle
                                 , filters model
+                                , p [] [ text (Debug.toString (fromUrl model.url)) ]
+                                , p [] [ text (Debug.toString model.url.query) ]
                                 , displayMangaList
                                     (sanitizeMangaList page.manga)
                                 ]
@@ -212,11 +230,17 @@ view model =
                             text "No manga's found."
     in
     case model.route of
+        Just (Home (Just "search")) ->
+            baseLayout children
+
         Just (Home _) ->
             baseLayout children
 
+        Just NotFound ->
+            { title = "elm-layout", body = [ div [] [ text "Invalid route" ] ] }
+
         Nothing ->
-            { title = "elm-layout", body = [ div [] [ text "invalid route" ] ] }
+            { title = "elm-layout", body = [ div [] [ text "Invalid route" ] ] }
 
 
 
@@ -248,7 +272,7 @@ searchFilter model =
     div []
         [ div [ class "text-gray-700 font-bold" ] [ text "Search" ]
         , div []
-            [ form [ onSubmit Refetch ]
+            [ form [ onSubmit SetUrl ]
                 [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] [ text model.searchTerm ]
                 ]
             ]
