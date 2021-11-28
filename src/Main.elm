@@ -1,32 +1,19 @@
-module Main exposing (..)
+module Main exposing (Msg(..))
 
-import AniList.Enum.MediaSort
-import AniList.Enum.MediaType
-import AniList.Object
-import AniList.Object.Media as Media
-import AniList.Object.MediaCoverImage as CoverImage
-import AniList.Object.MediaExternalLink exposing (url)
-import AniList.Object.MediaTitle as MediaTitle
-import AniList.Object.Page as Page
-import AniList.Query as Query
-import Array exposing (set)
+import API.Api exposing (Manga, MangaData, query, sanitizeCoverImage, sanitizeGenres, sanitizeMangaList, sanitizeTitle)
 import Browser exposing (UrlRequest(..))
 import Browser.Navigation as Nav
 import Graphql.Http
-import Graphql.Operation exposing (RootQuery)
-import Graphql.OptionalArgument exposing (..)
-import Graphql.SelectionSet as SelectionSet exposing (SelectionSet)
 import Html exposing (..)
 import Html.Attributes exposing (class, href, placeholder, src, type_)
-import Html.Events exposing (on, onInput, onSubmit)
+import Html.Events exposing (onInput)
 import Loading
     exposing
         ( LoaderType(..)
         , defaultConfig
         )
-import Maybe.Extra exposing (or)
 import Process
-import RemoteData exposing (RemoteData)
+import RemoteData
 import Task
 import Url exposing (..)
 import Url.Builder exposing (Root(..))
@@ -55,7 +42,7 @@ main =
 
 
 type alias Model =
-    { data : RemoteData (Graphql.Http.Error Response) Response, key : Nav.Key, url : Url.Url, route : Maybe Route }
+    { data : MangaData, key : Nav.Key, url : Url.Url, route : Maybe Route }
 
 
 type Route
@@ -63,24 +50,12 @@ type Route
     | NotFound
 
 
-type alias Response =
-    Maybe Page
-
-
-type alias Page =
-    { manga : Maybe (List (Maybe Manga)) }
-
-
-type alias Manga =
-    { id : Int, averageScore : Maybe Int, title : Maybe Title, coverImage : Maybe CoverImage, genres : Maybe (List (Maybe String)) }
-
-
-type alias Title =
-    { romaji : Maybe String, english : Maybe String }
-
-
-type alias CoverImage =
-    { large : Maybe String }
+makeRequest : Maybe String -> Cmd Msg
+makeRequest searchTerm =
+    searchTerm
+        |> query
+        |> Graphql.Http.queryRequest "https://graphql.anilist.co/"
+        |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
@@ -95,56 +70,11 @@ send msg =
 
 
 
--- Gql API related functions
-
-
-query : Maybe String -> SelectionSet (Maybe Page) RootQuery
-query searchTerm =
-    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 100 }) (pageSelection searchTerm)
-
-
-pageSelection : Maybe String -> SelectionSet Page AniList.Object.Page
-pageSelection searchTerm =
-    SelectionSet.map Page (Page.media (\optionals -> { optionals | type_ = Present AniList.Enum.MediaType.Manga, sort = Present [ Just AniList.Enum.MediaSort.ScoreDesc ], isAdult = Present False, search = fromMaybe searchTerm }) mediaSelection)
-
-
-mediaSelection : SelectionSet Manga AniList.Object.Media
-mediaSelection =
-    SelectionSet.map5 Manga
-        Media.id
-        Media.averageScore
-        (Media.title titleSelection)
-        (Media.coverImage coverImageSelection)
-        Media.genres
-
-
-titleSelection : SelectionSet Title AniList.Object.MediaTitle
-titleSelection =
-    SelectionSet.map2 Title
-        (MediaTitle.english identity)
-        (MediaTitle.romaji identity)
-
-
-coverImageSelection : SelectionSet CoverImage AniList.Object.MediaCoverImage
-coverImageSelection =
-    SelectionSet.map CoverImage
-        CoverImage.large
-
-
-makeRequest : Maybe String -> Cmd Msg
-makeRequest searchTerm =
-    searchTerm
-        |> query
-        |> Graphql.Http.queryRequest "https://graphql.anilist.co/"
-        |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
-
-
-
 ---- UPDATE ----
 
 
 type Msg
-    = GotResponse (RemoteData (Graphql.Http.Error Response) Response)
+    = GotResponse MangaData
     | ChangeInput String
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
@@ -157,7 +87,7 @@ update msg model =
             ( { model | data = response }, Cmd.none )
 
         ChangeInput newInput ->
-            ( model, delay 2000 (setSearchQueryParam model.key newInput) )
+            ( model, setSearchQueryParam model.key newInput )
 
         LinkClicked urlRequest ->
             case urlRequest of
@@ -337,53 +267,3 @@ displayGenres genres =
 
 
 -- Gql helper functions, predominately dealing with the Maybe type which the schema is rife with
-
-
-sanitizeMangaList : Maybe (List (Maybe Manga)) -> List Manga
-sanitizeMangaList mangaList =
-    case mangaList of
-        Just list ->
-            List.filterMap identity list
-
-        Nothing ->
-            []
-
-
-sanitizeTitle : Maybe Title -> String
-sanitizeTitle title =
-    case title of
-        Just { romaji, english } ->
-            Maybe.withDefault "No title found" (or romaji english)
-
-        Nothing ->
-            "No title found"
-
-
-sanitizeCoverImage : Maybe CoverImage -> String
-sanitizeCoverImage image =
-    case image of
-        Just { large } ->
-            Maybe.withDefault "No image found" large
-
-        Nothing ->
-            "No image found"
-
-
-sanitizeGenres : Maybe (List (Maybe String)) -> List String
-sanitizeGenres genreList =
-    case genreList of
-        Just list ->
-            List.filterMap identity list
-
-        Nothing ->
-            []
-
-
-sanitizeAverageScore : Maybe Int -> String
-sanitizeAverageScore score =
-    case score of
-        Just s ->
-            String.fromInt s
-
-        Nothing ->
-            "No score"
