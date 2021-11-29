@@ -12,7 +12,7 @@ import Loading
         ( LoaderType(..)
         , defaultConfig
         )
-import RemoteData
+import RemoteData exposing (RemoteData(..))
 import Route exposing (Route(..), fromUrl, setQueryParam)
 import Task exposing (perform)
 import Url exposing (..)
@@ -39,7 +39,7 @@ main =
 
 
 type alias Model =
-    { data : MangaData, key : Nav.Key, url : Url.Url, route : Maybe Route }
+    { data : MangaData, key : Nav.Key, url : Url.Url, route : Maybe Route, isLoading : Bool }
 
 
 makeRequest : Maybe String -> Cmd Msg
@@ -52,7 +52,7 @@ makeRequest searchTerm =
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url key =
-    ( { data = RemoteData.Loading, key = key, url = url, route = Just (fromUrl url) }, send (UrlChanged url) )
+    ( { data = RemoteData.Loading, key = key, url = url, route = Just (fromUrl url), isLoading = True }, send (UrlChanged url) )
 
 
 send : msg -> Cmd msg
@@ -70,14 +70,19 @@ type Msg
     | ChangeInput String
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
+    | IsLoading
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        GotResponse response ->
-            ( { model | data = response }, Cmd.none )
+        IsLoading ->
+            ( { model | isLoading = True }, Cmd.none )
 
+        GotResponse response ->
+            ( { model | data = response, isLoading = False }, Cmd.none )
+
+        -- NOTE: once I have a way to debounce setting query param, I can set data = RemoteData.Loading
         ChangeInput newInput ->
             ( model, setQueryParam model.key newInput )
 
@@ -117,54 +122,32 @@ subscriptions _ =
 
 view : Model -> Browser.Document Msg
 view model =
-    let
-        renderHomePage searchTerm =
-            case model.data of
-                RemoteData.Loading ->
-                    loadingSpinner
-
-                RemoteData.NotAsked ->
-                    text "Not asked"
-
-                RemoteData.Failure _ ->
-                    text "Unable to fetch mangas"
-
-                RemoteData.Success response ->
-                    case response of
-                        Just page ->
-                            div []
-                                [ siteTitle
-                                , filters searchTerm
-                                , p [] [ text (Debug.toString (fromUrl model.url)) ]
-                                , p [] [ text (Debug.toString model.route) ]
-                                , displayMangaList
-                                    (sanitizeMangaList page.manga)
-                                ]
-
-                        Nothing ->
-                            text "No manga's found."
-    in
     case model.route of
         Just (Home searchTerm) ->
-            baseLayout (renderHomePage searchTerm)
+            baseLayout model.isLoading searchTerm model.data
 
         Just NotFound ->
-            { title = "elm-layout", body = [ div [] [ text "Invalid route" ] ] }
+            { title = "elm-manga", body = [ div [] [ text "Invalid route" ] ] }
 
         Nothing ->
-            { title = "elm-layout", body = [ div [] [ text "Invalid route" ] ] }
+            { title = "elm-manga", body = [ div [] [ text "Invalid route" ] ] }
 
 
 
 -- View functions
 
 
-baseLayout : Html Msg -> Browser.Document Msg
-baseLayout children =
+baseLayout : Bool -> Maybe String -> MangaData -> Browser.Document Msg
+baseLayout isLoading searchTerm mangaData =
     { title = "elm-manga"
     , body =
         [ div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
-            [ children ]
+            [ if isLoading then
+                div [] [ loadingSpinner ]
+
+              else
+                div [] [ siteTitle, filters searchTerm, displayMangaList mangaData ]
+            ]
         ]
     }
 
@@ -201,10 +184,26 @@ loadingSpinner =
         ]
 
 
-displayMangaList : List Manga -> Html Msg
-displayMangaList mangaList =
-    div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6" ]
-        (List.map displayManga mangaList)
+displayMangaList : MangaData -> Html Msg
+displayMangaList response =
+    case response of
+        Loading ->
+            loadingSpinner
+
+        NotAsked ->
+            text "Not asked"
+
+        Failure _ ->
+            text "Failed to fetch list of manga's"
+
+        Success resp ->
+            case resp of
+                Just pageOfManga ->
+                    div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6" ]
+                        (List.map displayManga (sanitizeMangaList pageOfManga.manga))
+
+                Nothing ->
+                    text "No manga's to display"
 
 
 displayManga : Manga -> Html Msg
