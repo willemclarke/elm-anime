@@ -12,13 +12,10 @@ import Loading
         ( LoaderType(..)
         , defaultConfig
         )
-import Process
 import RemoteData
-import Task
+import Route exposing (Route(..), fromUrl, setQueryParam)
+import Task exposing (perform)
 import Url exposing (..)
-import Url.Builder exposing (Root(..))
-import Url.Parser exposing ((</>), (<?>))
-import Url.Parser.Query
 
 
 
@@ -43,11 +40,6 @@ main =
 
 type alias Model =
     { data : MangaData, key : Nav.Key, url : Url.Url, route : Maybe Route }
-
-
-type Route
-    = Home (Maybe String)
-    | NotFound
 
 
 makeRequest : Maybe String -> Cmd Msg
@@ -87,7 +79,7 @@ update msg model =
             ( { model | data = response }, Cmd.none )
 
         ChangeInput newInput ->
-            ( model, setSearchQueryParam model.key newInput )
+            ( model, setQueryParam model.key newInput )
 
         LinkClicked urlRequest ->
             case urlRequest of
@@ -108,27 +100,6 @@ update msg model =
 
                 NotFound ->
                     ( { model | url = url, route = Just route }, Cmd.none )
-
-
-delay : Float -> msg -> Cmd msg
-delay time msg =
-    Process.sleep time |> Task.andThen (always <| Task.succeed msg) |> Task.perform identity
-
-
-setSearchQueryParam : Nav.Key -> String -> Cmd Msg
-setSearchQueryParam key queryString =
-    Nav.replaceUrl key <| Url.Builder.relative [ "/" ] [ Url.Builder.string "search" queryString ]
-
-
-fromUrl : Url.Url -> Route
-fromUrl url =
-    Maybe.withDefault NotFound (Url.Parser.parse urlParser url)
-
-
-urlParser : Url.Parser.Parser (Route -> a) a
-urlParser =
-    Url.Parser.oneOf
-        [ Url.Parser.map Home <| Url.Parser.top <?> Url.Parser.Query.string "search" ]
 
 
 
@@ -263,7 +234,3 @@ displayGenres genres =
     else
         div [ class "mx-2" ]
             (List.map (\genre -> span [ class "inline-block bg-blue-200 rounded-full px-2 text-xs font-semibold text-gray-700 mr-1 mb-1" ] [ text genre ]) firstTwoGenres)
-
-
-
--- Gql helper functions, predominately dealing with the Maybe type which the schema is rife with
