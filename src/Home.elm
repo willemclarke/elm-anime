@@ -1,9 +1,8 @@
-module Main exposing (Msg(..))
+module Home exposing (..)
 
-import Api exposing (Manga, MangaData, query, sanitizeCoverImage, sanitizeGenres, sanitizeMangaList, sanitizeTitle)
-import Browser exposing (UrlRequest(..))
+import Api exposing (Manga, MangaData, sanitizeCoverImage, sanitizeGenres, sanitizeMangaList, sanitizeTitle)
+import Browser
 import Browser.Navigation as Nav
-import Graphql.Http
 import Html exposing (..)
 import Html.Attributes exposing (class, href, placeholder, src, type_)
 import Html.Events exposing (onInput)
@@ -13,128 +12,34 @@ import Loading
         , defaultConfig
         )
 import RemoteData exposing (RemoteData(..))
-import Route exposing (Route(..), fromUrl, setQueryParam)
-import Task exposing (perform)
-import Url exposing (..)
-
-
-
---- MAIN ----
-
-
-main : Program () Model Msg
-main =
-    Browser.application
-        { view = view
-        , init = init
-        , update = update
-        , subscriptions = always Sub.none
-        , onUrlChange = UrlChanged
-        , onUrlRequest = LinkClicked
-        }
-
-
-
----- MODEL ----
+import Route exposing (setQueryParam)
 
 
 type alias Model =
-    { data : MangaData, key : Nav.Key, url : Url.Url, route : Maybe Route, isLoading : Bool }
-
-
-makeRequest : Maybe String -> Cmd Msg
-makeRequest searchTerm =
-    searchTerm
-        |> query
-        |> Graphql.Http.queryRequest "https://graphql.anilist.co/"
-        |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
-
-
-init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init _ url key =
-    ( { data = RemoteData.Loading, key = key, url = url, route = Just (fromUrl url), isLoading = True }, send (UrlChanged url) )
-
-
-send : msg -> Cmd msg
-send msg =
-    Task.succeed msg
-        |> Task.perform identity
+    { data : MangaData, isLoading : Bool, key : Nav.Key }
 
 
 
----- UPDATE ----
+-- Init
+-- it might be wrong to have a Nav.Key in my model/init, since the main page will have this
 
 
-type Msg
-    = GotResponse MangaData
-    | ChangeInput String
-    | LinkClicked Browser.UrlRequest
-    | UrlChanged Url.Url
-    | IsLoading
-
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        IsLoading ->
-            ( { model | isLoading = True }, Cmd.none )
-
-        GotResponse response ->
-            ( { model | data = response, isLoading = False }, Cmd.none )
-
-        -- NOTE: once I have a way to debounce setting query param, I can set data = RemoteData.Loading
-        ChangeInput newInput ->
-            ( model, setQueryParam model.key newInput )
-
-        LinkClicked urlRequest ->
-            case urlRequest of
-                Browser.Internal url ->
-                    ( model, Nav.pushUrl model.key <| Url.toString url )
-
-                Browser.External href ->
-                    ( model, Nav.load href )
-
-        UrlChanged url ->
-            let
-                route =
-                    fromUrl url
-            in
-            case route of
-                Home searchTerm ->
-                    ( { model | url = url, route = Just route }, makeRequest searchTerm )
-
-                NotFound ->
-                    ( { model | url = url, route = Just route }, Cmd.none )
+init : () -> Nav.Key -> ( Model, Cmd Msg )
+init _ key =
+    ( { data = RemoteData.Loading, key = key, isLoading = True }, Cmd.none )
 
 
 
----- SUBSCRIPTIONS ----
-
-
-subscriptions : Model -> Sub Msg
-subscriptions _ =
-    Sub.none
-
-
-
----- VIEW ----
+-- View
 
 
 view : Model -> Browser.Document Msg
 view model =
-    case model.route of
-        Just (Home searchTerm) ->
-            baseLayout model.isLoading searchTerm model.data
-
-        Just NotFound ->
-            { title = "elm-manga", body = [ div [] [ text "Invalid route" ] ] }
-
-        Nothing ->
-            { title = "elm-manga", body = [ div [] [ text "Invalid route" ] ] }
+    { title = "elm-manga", body = [] }
 
 
 
--- View functions
+-- view functions
 
 
 baseLayout : Bool -> Maybe String -> MangaData -> Browser.Document Msg
@@ -233,3 +138,26 @@ displayGenres genres =
     else
         div [ class "mx-2" ]
             (List.map (\genre -> span [ class "inline-block bg-blue-200 rounded-full px-2 text-xs font-semibold text-gray-700 mr-1 mb-1" ] [ text genre ]) firstTwoGenres)
+
+
+
+-- Update
+
+
+type Msg
+    = GotResponse MangaData
+    | ChangeInput String
+    | IsLoading
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        IsLoading ->
+            ( { model | isLoading = True }, Cmd.none )
+
+        GotResponse resp ->
+            ( { model | data = resp, isLoading = False }, Cmd.none )
+
+        ChangeInput newInput ->
+            ( model, setQueryParam model.key newInput )

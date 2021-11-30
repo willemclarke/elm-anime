@@ -1,4 +1,4 @@
-module API.Api exposing (Manga, MangaData, query, sanitizeAverageScore, sanitizeCoverImage, sanitizeGenres, sanitizeMangaList, sanitizeTitle)
+module Api exposing (Manga, MangaData, query, sanitizeAverageScore, sanitizeCoverImage, sanitizeGenres, sanitizeMangaList, sanitizeTitle)
 
 import AniList.Enum.MediaSort
 import AniList.Enum.MediaType
