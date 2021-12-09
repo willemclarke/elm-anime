@@ -1,9 +1,12 @@
 module Main exposing (Msg(..))
 
+-- import Home
+
 import Api exposing (Manga, MangaData, query, sanitizeCoverImage, sanitizeGenres, sanitizeMangaList, sanitizeTitle)
 import Browser exposing (UrlRequest(..))
 import Browser.Navigation as Nav
 import Graphql.Http
+import Home
 import Html exposing (..)
 import Html.Attributes exposing (class, href, placeholder, src, type_)
 import Html.Events exposing (onInput)
@@ -13,7 +16,7 @@ import Loading
         , defaultConfig
         )
 import RemoteData exposing (RemoteData(..))
-import Route exposing (Route(..), fromUrl, setQueryParam)
+import Route exposing (Route(..))
 import Task exposing (perform)
 import Url exposing (..)
 
@@ -35,11 +38,13 @@ main =
 
 
 
----- MODEL ----
+-- MODEL ----
+-- type alias Model =
+--     { data : MangaData, key : Nav.Key, url : Url.Url, route : Maybe Route, isLoading : Bool }
 
 
-type alias Model =
-    { data : MangaData, key : Nav.Key, url : Url.Url, route : Maybe Route, isLoading : Bool }
+type Model
+    = Home (Maybe String) Home.Model
 
 
 makeRequest : Maybe String -> Cmd Msg
@@ -51,12 +56,18 @@ makeRequest searchTerm =
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init _ url key =
-    ( { data = RemoteData.Loading, key = key, url = url, route = Just (fromUrl url), isLoading = True }, send (UrlChanged url) )
+init url _ =
+    changeRouteTo (Route.fromUrl url)
 
 
-send : msg -> Cmd msg
-send msg =
+
+-- init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
+-- init _ url key =
+--     ( { data = RemoteData.Loading, key = key, url = url, route = Just (Route.fromUrl url), isLoading = True }, sendMsg (UrlChanged url) )
+
+
+sendMsg : msg -> Cmd msg
+sendMsg msg =
     Task.succeed msg
         |> Task.perform identity
 
@@ -71,6 +82,20 @@ type Msg
     | LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
     | IsLoading
+    | GotHomeMsg Home.Msg
+
+
+
+-- changeRouteTo : Route -> Model -> ( Model, Cmd Msg )
+-- changeRouteTo route model =
+--     -- Route.Home username ->
+--     --     Home.init username
+--     --         |> updateWith (Profile username) GotProfileMsg model
+--     case route of
+--         Route.Home searchTerm ->
+--             ( model, Route.setQueryParam model.key (Maybe.withDefault "" searchTerm) )
+--         Route.NotFound ->
+--             ( model, Cmd.none )
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -84,7 +109,7 @@ update msg model =
 
         -- NOTE: once I have a way to debounce setting query param, I can set data = RemoteData.Loading
         ChangeInput newInput ->
-            ( model, setQueryParam model.key newInput )
+            ( model, Route.setQueryParam model.key newInput )
 
         LinkClicked urlRequest ->
             case urlRequest of
@@ -94,20 +119,45 @@ update msg model =
                 Browser.External href ->
                     ( model, Nav.load href )
 
+        -- changeRouteTo function in here
         UrlChanged url ->
             let
                 route =
-                    fromUrl url
+                    Route.fromUrl url
             in
             case route of
-                Home searchTerm ->
+                Route.Home searchTerm ->
                     ( { model | url = url, route = Just route }, makeRequest searchTerm )
 
                 NotFound ->
                     ( { model | url = url, route = Just route }, Cmd.none )
 
+        ( GotHomeMsg subMsg, Home searchTerm home ) ->
+            Home.update subMsg home
+                |> updateWith (Home searchTerm) GotHomeMsg model
 
 
+changeRouteTo : Maybe Route -> Model -> ( Model, Cmd Msg )
+changeRouteTo route model =
+    case route of
+        Just Route.NotFound ->
+            ( model, Cmd.none )
+
+        Just (Route.Home searchTerm) ->
+            Home.init searchTerm
+                |> updateWith (Home searchTerm) GotHomeMsg model
+
+
+updateWith : (subModel -> Model) -> (subMsg -> Msg) -> Model -> ( subModel, Cmd subMsg ) -> ( Model, Cmd Msg )
+updateWith toModel toMsg model ( subModel, subCmd ) =
+    ( toModel subModel
+    , Cmd.map toMsg subCmd
+    )
+
+
+
+-- In UrlChanged instead of binding route here, I need a changeRouteTo : Route -> Model (Model, Cmd Msg) which will handle what im
+-- currently doing more smartly
 ---- SUBSCRIPTIONS ----
 
 
@@ -123,14 +173,14 @@ subscriptions _ =
 view : Model -> Browser.Document Msg
 view model =
     case model.route of
-        Just (Home searchTerm) ->
+        Just (Route.Home searchTerm) ->
             baseLayout model.isLoading searchTerm model.data
 
-        Just NotFound ->
-            { title = "elm-manga", body = [ div [] [ text "Invalid route" ] ] }
+        Just Route.NotFound ->
+            { title = "elm-manga", body = [ div [] [ text "This page does not exist" ] ] }
 
         Nothing ->
-            { title = "elm-manga", body = [ div [] [ text "Invalid route" ] ] }
+            { title = "elm-manga", body = [ div [] [ text "This page does not exist" ] ] }
 
 
 

@@ -2,7 +2,7 @@ module Home exposing (..)
 
 import Api exposing (Manga, MangaData, sanitizeCoverImage, sanitizeGenres, sanitizeMangaList, sanitizeTitle)
 import Browser
-import Browser.Navigation as Nav
+import Graphql.Http
 import Html exposing (..)
 import Html.Attributes exposing (class, href, placeholder, src, type_)
 import Html.Events exposing (onInput)
@@ -16,26 +16,25 @@ import Route exposing (setQueryParam)
 
 
 type alias Model =
-    { data : MangaData, isLoading : Bool, key : Nav.Key }
+    { data : MangaData, isLoading : Bool }
 
 
-
--- Init
--- it might be wrong to have a Nav.Key in my model/init, since the main page will have this
-
-
-init : () -> Nav.Key -> ( Model, Cmd Msg )
-init _ key =
-    ( { data = RemoteData.Loading, key = key, isLoading = True }, Cmd.none )
-
-
-
--- View
+init : Maybe String -> ( Model, Cmd Msg )
+init searchTerm =
+    ( { data = RemoteData.Loading, isLoading = True }, makeRequest Nothing )
 
 
 view : Model -> Browser.Document Msg
 view model =
     { title = "elm-manga", body = [] }
+
+
+makeRequest : Maybe String -> Cmd Msg
+makeRequest searchTerm =
+    searchTerm
+        |> Api.query
+        |> Graphql.Http.queryRequest "https://graphql.anilist.co/"
+        |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
 
 
 
@@ -160,4 +159,4 @@ update msg model =
             ( { model | data = resp, isLoading = False }, Cmd.none )
 
         ChangeInput newInput ->
-            ( model, setQueryParam model.key newInput )
+            ( model, Cmd.none )
