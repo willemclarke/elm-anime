@@ -16,17 +16,17 @@ import Route exposing (setQueryParam)
 
 
 type alias Model =
-    { data : MangaData, isLoading : Bool }
+    { data : MangaData, isLoading : Bool, searchTerm : Maybe String }
 
 
 init : Maybe String -> ( Model, Cmd Msg )
 init searchTerm =
-    ( { data = RemoteData.Loading, isLoading = True }, makeRequest Nothing )
+    ( { data = RemoteData.Loading, isLoading = True, searchTerm = searchTerm }, makeRequest Nothing )
 
 
-view : Model -> Browser.Document Msg
-view model =
-    { title = "elm-manga", body = [] }
+view : Maybe String -> Model -> Browser.Document Msg
+view searchTerm model =
+    { title = "elm-manga", body = [ div [] [ text "This page does not exist" ] ] }
 
 
 makeRequest : Maybe String -> Cmd Msg
