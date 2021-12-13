@@ -2,14 +2,11 @@ module Main exposing (Msg(..))
 
 -- import Home
 
-import Api exposing (Manga, MangaData, query, sanitizeCoverImage, sanitizeGenres, sanitizeMangaList, sanitizeTitle)
 import Browser exposing (UrlRequest(..))
 import Browser.Navigation as Nav
-import Graphql.Http
-import Home
+import Home exposing (Model)
 import Html exposing (..)
-import Html.Attributes exposing (class, href, placeholder, src, type_)
-import Html.Events exposing (onInput)
+import Html.Attributes exposing (href)
 import Loading
     exposing
         ( LoaderType(..)
@@ -19,6 +16,8 @@ import RemoteData exposing (RemoteData(..))
 import Route exposing (Route(..))
 import Task exposing (perform)
 import Url exposing (..)
+import Url.Parser exposing ((</>), (<?>))
+import Url.Parser.Query
 
 
 
@@ -39,24 +38,20 @@ main =
 
 
 -- MODEL ----
--- type alias Model =
---     { data : MangaData, key : Nav.Key, url : Url.Url, route : Maybe Route, isLoading : Bool }
 
 
-type Model
-    = Blank
-    | Home (Maybe String) Home.Model
+type alias Model =
+    { key : Nav.Key, page : Page }
+
+
+type Page
+    = Home Home.Model
+    | NotFound
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url navKey =
-    changeRouteTo (Route.fromUrl url) Blank
-
-
-
--- init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
--- init _ url key =
---     ( { data = RemoteData.Loading, key = key, url = url, route = Just (Route.fromUrl url), isLoading = True }, sendMsg (UrlChanged url) )
+    stepUrl url { key = navKey, page = NotFound }
 
 
 sendMsg : msg -> Cmd msg
@@ -72,50 +67,56 @@ sendMsg msg =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
-    | GotHomeMsg Home.Msg
+    | HomeMsg Home.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case ( msg, model ) of
-        ( LinkClicked urlRequest, _ ) ->
+update message model =
+    case message of
+        LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
-                    ( model, Nav.pushUrl navKey <| Url.toString url )
+                    ( model, Nav.pushUrl model.key <| Url.toString url )
 
                 Browser.External href ->
                     ( model, Nav.load href )
 
-        ( UrlChanged url, _ ) ->
-            changeRouteTo (Route.fromUrl url) model
+        UrlChanged url ->
+            stepUrl url model
 
-        ( GotHomeMsg subMsg, Home searchTerm home ) ->
-            Home.update subMsg home
-                |> updateWith (Home searchTerm) GotHomeMsg model
+        HomeMsg msg ->
+            case model.page of
+                Home homeModel ->
+                    stepHome Nothing model (Home.update msg homeModel)
 
-        ( _, _ ) ->
-            ( model, Cmd.none )
+                NotFound ->
+                    ( model, Cmd.none )
 
 
-changeRouteTo : Maybe Route -> Model -> ( Model, Cmd Msg )
-changeRouteTo route model =
-    case route of
+route : Url.Parser.Parser a b -> a -> Url.Parser.Parser (b -> c) c
+route parser handler =
+    Url.Parser.map handler parser
+
+
+stepHome : Maybe String -> Model -> ( Home.Model, Cmd Home.Msg ) -> ( Model, Cmd Msg )
+stepHome searchTerm model ( home, cmds ) =
+    ( { model | page = Home { home | searchTerm = searchTerm } }, Cmd.map HomeMsg cmds )
+
+
+stepUrl : Url.Url -> Model -> ( Model, Cmd Msg )
+stepUrl url model =
+    let
+        parser =
+            Url.Parser.oneOf
+                [ route (Url.Parser.top <?> Url.Parser.Query.string "search") (\queryStr -> stepHome queryStr model (Home.init queryStr model.key))
+                ]
+    in
+    case Url.Parser.parse parser url of
+        Just page ->
+            page
+
         Nothing ->
             ( model, Cmd.none )
-
-        Just Route.NotFound ->
-            ( model, Cmd.none )
-
-        Just (Route.Home searchTerm) ->
-            Home.init searchTerm
-                |> updateWith (Home searchTerm) GotHomeMsg model
-
-
-updateWith : (subModel -> Model) -> (subMsg -> Msg) -> Model -> ( subModel, Cmd subMsg ) -> ( Model, Cmd Msg )
-updateWith toModel toMsg model ( subModel, subCmd ) =
-    ( toModel subModel
-    , Cmd.map toMsg subCmd
-    )
 
 
 
@@ -133,9 +134,9 @@ subscriptions _ =
 
 view : Model -> Browser.Document Msg
 view model =
-    case model of
-        Blank ->
-            { title = "elm-manga", body = [ div [] [ text "This page does not exist" ] ] }
+    case model.page of
+        Home homeModel ->
+            Home.view HomeMsg homeModel
 
-        Home searchTerm homeModel ->
-            Home.view (searchTerm homeModel) GotHomeMsg
+        NotFound ->
+            { title = "elm-manga", body = [ div [] [ text "testing" ] ] }

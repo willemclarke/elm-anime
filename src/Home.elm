@@ -1,7 +1,8 @@
 module Home exposing (..)
 
-import Api exposing (Manga, MangaData, sanitizeCoverImage, sanitizeGenres, sanitizeMangaList, sanitizeTitle)
+import Api
 import Browser
+import Browser.Navigation
 import Graphql.Http
 import Html exposing (..)
 import Html.Attributes exposing (class, href, placeholder, src, type_)
@@ -15,18 +16,17 @@ import RemoteData exposing (RemoteData(..))
 import Route exposing (setQueryParam)
 
 
+
+-- MODEL
+
+
 type alias Model =
-    { data : MangaData, isLoading : Bool, searchTerm : Maybe String }
+    { data : Api.MangaData, isLoading : Bool, searchTerm : Maybe String, key : Browser.Navigation.Key }
 
 
-init : Maybe String -> ( Model, Cmd Msg )
-init searchTerm =
-    ( { data = RemoteData.Loading, isLoading = True, searchTerm = searchTerm }, makeRequest Nothing )
-
-
-view : Maybe String -> Model -> Browser.Document Msg
-view searchTerm model =
-    { title = "elm-manga", body = [ div [] [ text "This page does not exist" ] ] }
+init : Maybe String -> Browser.Navigation.Key -> ( Model, Cmd Msg )
+init searchTerm navKey =
+    ( { data = RemoteData.Loading, isLoading = True, searchTerm = searchTerm, key = navKey }, makeRequest searchTerm )
 
 
 makeRequest : Maybe String -> Cmd Msg
@@ -38,11 +38,39 @@ makeRequest searchTerm =
 
 
 
--- view functions
+-- UPDATE
 
 
-baseLayout : Bool -> Maybe String -> MangaData -> Browser.Document Msg
-baseLayout isLoading searchTerm mangaData =
+type Msg
+    = GotResponse Api.MangaData
+    | ChangeInput String
+    | IsLoading
+
+
+update : Msg -> Model -> ( Model, Cmd Msg )
+update msg model =
+    case msg of
+        IsLoading ->
+            ( { model | isLoading = True }, Cmd.none )
+
+        GotResponse resp ->
+            ( { model | data = resp, isLoading = False }, Cmd.none )
+
+        ChangeInput newInput ->
+            ( { model | data = RemoteData.Loading }, Route.setQueryParam model.key newInput )
+
+
+
+-- VIEW
+
+
+view : (Msg -> msg) -> Model -> Browser.Document msg
+view toMsg model =
+    baseLayout toMsg model.isLoading model.searchTerm model.data
+
+
+baseLayout : (Msg -> msg) -> Bool -> Maybe String -> Api.MangaData -> Browser.Document msg
+baseLayout toMsg isLoading searchTerm mangaData =
     { title = "elm-manga"
     , body =
         [ div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
@@ -53,6 +81,7 @@ baseLayout isLoading searchTerm mangaData =
                 div [] [ siteTitle, filters searchTerm, displayMangaList mangaData ]
             ]
         ]
+            |> List.map (Html.map toMsg)
     }
 
 
@@ -88,7 +117,7 @@ loadingSpinner =
         ]
 
 
-displayMangaList : MangaData -> Html Msg
+displayMangaList : Api.MangaData -> Html Msg
 displayMangaList response =
     case response of
         Loading ->
@@ -104,22 +133,22 @@ displayMangaList response =
             case resp of
                 Just pageOfManga ->
                     div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6" ]
-                        (List.map displayManga (sanitizeMangaList pageOfManga.manga))
+                        (List.map displayManga (Api.sanitizeMangaList pageOfManga.manga))
 
                 Nothing ->
                     text "No manga's to display"
 
 
-displayManga : Manga -> Html Msg
+displayManga : Api.Manga -> Html Msg
 displayManga manga =
     a [ href ("https://anilist.co/manga/" ++ String.fromInt manga.id) ]
         [ div [ class "w-48 h-80 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:text-indigo-900 hover:shadow-2xl" ]
-            [ img [ src (sanitizeCoverImage manga.coverImage), class "h-64 w-full" ]
+            [ img [ src (Api.sanitizeCoverImage manga.coverImage), class "h-64 w-full" ]
                 []
             , div
                 []
-                [ p [ class "text-l font-bold hover:font-black truncate mx-2 mt-1 mb-1" ] [ text (sanitizeTitle manga.title) ]
-                , displayGenres (sanitizeGenres manga.genres)
+                [ p [ class "text-l font-bold hover:font-black truncate mx-2 mt-1 mb-1" ] [ text (Api.sanitizeTitle manga.title) ]
+                , displayGenres (Api.sanitizeGenres manga.genres)
                 ]
             ]
         ]
@@ -137,26 +166,3 @@ displayGenres genres =
     else
         div [ class "mx-2" ]
             (List.map (\genre -> span [ class "inline-block bg-blue-200 rounded-full px-2 text-xs font-semibold text-gray-700 mr-1 mb-1" ] [ text genre ]) firstTwoGenres)
-
-
-
--- Update
-
-
-type Msg
-    = GotResponse MangaData
-    | ChangeInput String
-    | IsLoading
-
-
-update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        IsLoading ->
-            ( { model | isLoading = True }, Cmd.none )
-
-        GotResponse resp ->
-            ( { model | data = resp, isLoading = False }, Cmd.none )
-
-        ChangeInput newInput ->
-            ( model, Cmd.none )
