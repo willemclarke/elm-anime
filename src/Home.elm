@@ -66,19 +66,15 @@ update msg model =
 
 view : (Msg -> msg) -> Model -> Browser.Document msg
 view toMsg model =
-    baseLayout toMsg model.isLoading model.searchTerm model.data
+    baseLayout toMsg model.searchTerm model.data
 
 
-baseLayout : (Msg -> msg) -> Bool -> Maybe String -> Api.MangaData -> Browser.Document msg
-baseLayout toMsg isLoading searchTerm mangaData =
+baseLayout : (Msg -> msg) -> Maybe String -> Api.MangaData -> Browser.Document msg
+baseLayout toMsg searchTerm mangaData =
     { title = "elm-manga"
     , body =
         [ div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
-            [ if isLoading then
-                div [] [ loadingSpinner ]
-
-              else
-                div [] [ siteTitle, filters searchTerm, displayMangaList mangaData ]
+            [ div [ class "w-2/3" ] [ siteTitle, filters searchTerm, displayMangaList mangaData ]
             ]
         ]
             |> List.map (Html.map toMsg)
@@ -109,7 +105,7 @@ searchFilter searchTerm =
 
 loadingSpinner : Html Msg
 loadingSpinner =
-    div [ class "flex items-center h-full" ]
+    div [ class "flex h-full justify-center items-center" ]
         [ Loading.render
             Circle
             { defaultConfig | color = "#333" }
