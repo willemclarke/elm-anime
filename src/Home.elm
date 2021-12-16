@@ -65,14 +65,12 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    mangaListFrame model.searchTerm model.data
+    homeFrame model.searchTerm model.data
 
 
-mangaListFrame : Maybe String -> Api.MangaData -> Html Msg
-mangaListFrame searchTerm mangaData =
-    div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
-        [ div [ class "w-2/3" ] [ filters searchTerm, displayMangaList mangaData ]
-        ]
+homeFrame : Maybe String -> Api.MangaData -> Html Msg
+homeFrame searchTerm mangaData =
+    div [] [ filters searchTerm, displayMangaList mangaData ]
 
 
 filters : Maybe String -> Html Msg

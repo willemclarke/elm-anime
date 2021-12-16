@@ -122,13 +122,23 @@ view model =
                     text "Page not found."
     in
     { title = "elm-manga"
-    , body = [ viewNav, content ]
+    , body = [ pageFrame content ]
     }
 
 
-viewNav : Html Msg
-viewNav =
-    h1 [ class "text-center mt-2 text-3xl 2xl:text-4xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
+pageFrame : Html Msg -> Html Msg
+pageFrame content =
+    div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
+        [ div [ class "w-9/12" ]
+            [ pageHeader
+            , content
+            ]
+        ]
+
+
+pageHeader : Html Msg
+pageHeader =
+    h1 [ class "text-center mt-9 text-3xl 2xl:text-4xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
 
 
 
