@@ -1,7 +1,6 @@
 module Home exposing (..)
 
 import Api
-import Browser
 import Browser.Navigation
 import Graphql.Http
 import Html exposing (..)
@@ -13,7 +12,7 @@ import Loading
         , defaultConfig
         )
 import RemoteData exposing (RemoteData(..))
-import Route exposing (setQueryParam)
+import Route
 
 
 
@@ -64,26 +63,16 @@ update msg model =
 -- VIEW
 
 
-view : (Msg -> msg) -> Model -> Browser.Document msg
-view toMsg model =
-    baseLayout toMsg model.searchTerm model.data
+view : Model -> Html Msg
+view model =
+    mangaListFrame model.searchTerm model.data
 
 
-baseLayout : (Msg -> msg) -> Maybe String -> Api.MangaData -> Browser.Document msg
-baseLayout toMsg searchTerm mangaData =
-    { title = "elm-manga"
-    , body =
-        [ div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
-            [ div [ class "w-2/3" ] [ siteTitle, filters searchTerm, displayMangaList mangaData ]
-            ]
+mangaListFrame : Maybe String -> Api.MangaData -> Html Msg
+mangaListFrame searchTerm mangaData =
+    div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
+        [ div [ class "w-2/3" ] [ filters searchTerm, displayMangaList mangaData ]
         ]
-            |> List.map (Html.map toMsg)
-    }
-
-
-siteTitle : Html Msg
-siteTitle =
-    h1 [ class "text-center mt-2 text-3xl 2xl:text-4xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
 
 
 filters : Maybe String -> Html Msg

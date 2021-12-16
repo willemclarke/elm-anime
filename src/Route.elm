@@ -9,7 +9,6 @@ import Url.Parser.Query
 
 type Route
     = Home (Maybe String)
-    | NotFound
 
 
 parser : Url.Parser.Parser (Route -> a) a

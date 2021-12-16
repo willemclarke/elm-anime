@@ -1,23 +1,19 @@
 module Main exposing (Msg(..))
 
--- import Home
-
 import Browser exposing (UrlRequest(..))
 import Browser.Navigation as Nav
 import Home exposing (Model)
 import Html exposing (..)
-import Html.Attributes exposing (href)
+import Html.Attributes exposing (class, href)
 import Loading
     exposing
         ( LoaderType(..)
-        , defaultConfig
         )
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route(..))
 import Task exposing (perform)
 import Url exposing (..)
 import Url.Parser exposing ((</>), (<?>))
-import Url.Parser.Query
 
 
 
@@ -45,13 +41,13 @@ type alias Model =
 
 
 type Page
-    = Home Home.Model
+    = HomePage Home.Model
     | NotFound
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url navKey =
-    stepUrl url { key = navKey, page = NotFound }
+    updateUrl url { page = NotFound, key = navKey }
 
 
 sendMsg : msg -> Cmd msg
@@ -67,7 +63,7 @@ sendMsg msg =
 type Msg
     = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
-    | HomeMsg Home.Msg
+    | GotHomeMsg Home.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -82,41 +78,57 @@ update message model =
                     ( model, Nav.load href )
 
         UrlChanged url ->
-            stepUrl url model
+            updateUrl url model
 
-        HomeMsg msg ->
+        GotHomeMsg homeMsg ->
             case model.page of
-                Home homeModel ->
-                    stepHome Nothing model (Home.update msg homeModel)
+                HomePage homeModel ->
+                    toHome Nothing model (Home.update homeMsg homeModel)
 
                 NotFound ->
                     ( model, Cmd.none )
 
 
-route : Url.Parser.Parser a b -> a -> Url.Parser.Parser (b -> c) c
-route parser handler =
-    Url.Parser.map handler parser
+toHome : Maybe String -> Model -> ( Home.Model, Cmd Home.Msg ) -> ( Model, Cmd Msg )
+toHome searchTerm model ( home, cmds ) =
+    ( { model | page = HomePage { home | searchTerm = searchTerm } }, Cmd.map GotHomeMsg cmds )
 
 
-stepHome : Maybe String -> Model -> ( Home.Model, Cmd Home.Msg ) -> ( Model, Cmd Msg )
-stepHome searchTerm model ( home, cmds ) =
-    ( { model | page = Home { home | searchTerm = searchTerm } }, Cmd.map HomeMsg cmds )
-
-
-stepUrl : Url.Url -> Model -> ( Model, Cmd Msg )
-stepUrl url model =
-    let
-        parser =
-            Url.Parser.oneOf
-                [ route (Url.Parser.top <?> Url.Parser.Query.string "search") (\queryStr -> stepHome queryStr model (Home.init queryStr model.key))
-                ]
-    in
-    case Url.Parser.parse parser url of
-        Just page ->
-            page
+updateUrl : Url.Url -> Model -> ( Model, Cmd Msg )
+updateUrl url model =
+    case Route.fromUrl url of
+        Just (Route.Home queryStr) ->
+            Home.init queryStr model.key
+                |> toHome queryStr model
 
         Nothing ->
-            ( model, Cmd.none )
+            ( { model | page = NotFound }, Cmd.none )
+
+
+
+---- VIEW ----
+
+
+view : Model -> Browser.Document Msg
+view model =
+    let
+        content =
+            case model.page of
+                HomePage homeModel ->
+                    Home.view homeModel
+                        |> Html.map GotHomeMsg
+
+                NotFound ->
+                    text "Page not found."
+    in
+    { title = "elm-manga"
+    , body = [ viewNav, content ]
+    }
+
+
+viewNav : Html Msg
+viewNav =
+    h1 [ class "text-center mt-2 text-3xl 2xl:text-4xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
 
 
 
@@ -126,17 +138,3 @@ stepUrl url model =
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.none
-
-
-
----- VIEW ----
-
-
-view : Model -> Browser.Document Msg
-view model =
-    case model.page of
-        Home homeModel ->
-            Home.view HomeMsg homeModel
-
-        NotFound ->
-            { title = "elm-manga", body = [ div [] [ text "testing" ] ] }

@@ -47,7 +47,7 @@ query searchTerm =
 
 
 
--- functions to handle Maybe's, which this api's schema was rife with
+-- helpers to handle Maybe's, which this api's schema was rife with
 
 
 pageSelection : Maybe String -> SelectionSet Page AniList.Object.Page
