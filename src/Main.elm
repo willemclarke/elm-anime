@@ -1,21 +1,19 @@
 module Main exposing (Msg(..))
 
-import API.Api exposing (Manga, MangaData, query, sanitizeCoverImage, sanitizeGenres, sanitizeMangaList, sanitizeTitle)
 import Browser exposing (UrlRequest(..))
 import Browser.Navigation as Nav
-import Graphql.Http
+import Home exposing (Model)
 import Html exposing (..)
-import Html.Attributes exposing (class, href, placeholder, src, type_)
-import Html.Events exposing (onInput)
+import Html.Attributes exposing (class, href)
 import Loading
     exposing
         ( LoaderType(..)
-        , defaultConfig
         )
 import RemoteData exposing (RemoteData(..))
-import Route exposing (Route(..), fromUrl, setQueryParam)
+import Route exposing (Route(..))
 import Task exposing (perform)
 import Url exposing (..)
+import Url.Parser exposing ((</>), (<?>))
 
 
 
@@ -35,28 +33,25 @@ main =
 
 
 
----- MODEL ----
+-- MODEL ----
 
 
 type alias Model =
-    { data : MangaData, key : Nav.Key, url : Url.Url, route : Maybe Route, isLoading : Bool }
+    { key : Nav.Key, page : Page }
 
 
-makeRequest : Maybe String -> Cmd Msg
-makeRequest searchTerm =
-    searchTerm
-        |> query
-        |> Graphql.Http.queryRequest "https://graphql.anilist.co/"
-        |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
+type Page
+    = HomePage Home.Model
+    | NotFound
 
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
-init _ url key =
-    ( { data = RemoteData.Loading, key = key, url = url, route = Just (fromUrl url), isLoading = True }, send (UrlChanged url) )
+init _ url navKey =
+    updateUrl url { page = NotFound, key = navKey }
 
 
-send : msg -> Cmd msg
-send msg =
+sendMsg : msg -> Cmd msg
+sendMsg msg =
     Task.succeed msg
         |> Task.perform identity
 
@@ -66,26 +61,14 @@ send msg =
 
 
 type Msg
-    = GotResponse MangaData
-    | ChangeInput String
-    | LinkClicked Browser.UrlRequest
+    = LinkClicked Browser.UrlRequest
     | UrlChanged Url.Url
-    | IsLoading
+    | GotHomeMsg Home.Msg
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
-update msg model =
-    case msg of
-        IsLoading ->
-            ( { model | isLoading = True }, Cmd.none )
-
-        GotResponse response ->
-            ( { model | data = response, isLoading = False }, Cmd.none )
-
-        -- NOTE: once I have a way to debounce setting query param, I can set data = RemoteData.Loading
-        ChangeInput newInput ->
-            ( model, setQueryParam model.key newInput )
-
+update message model =
+    case message of
         LinkClicked urlRequest ->
             case urlRequest of
                 Browser.Internal url ->
@@ -95,16 +78,67 @@ update msg model =
                     ( model, Nav.load href )
 
         UrlChanged url ->
-            let
-                route =
-                    fromUrl url
-            in
-            case route of
-                Home searchTerm ->
-                    ( { model | url = url, route = Just route }, makeRequest searchTerm )
+            updateUrl url model
+
+        GotHomeMsg homeMsg ->
+            case model.page of
+                HomePage homeModel ->
+                    toHome Nothing model (Home.update homeMsg homeModel)
 
                 NotFound ->
-                    ( { model | url = url, route = Just route }, Cmd.none )
+                    ( model, Cmd.none )
+
+
+toHome : Maybe String -> Model -> ( Home.Model, Cmd Home.Msg ) -> ( Model, Cmd Msg )
+toHome searchTerm model ( home, cmds ) =
+    ( { model | page = HomePage { home | searchTerm = searchTerm } }, Cmd.map GotHomeMsg cmds )
+
+
+updateUrl : Url.Url -> Model -> ( Model, Cmd Msg )
+updateUrl url model =
+    case Route.fromUrl url of
+        Just (Route.Home queryStr) ->
+            Home.init queryStr model.key
+                |> toHome queryStr model
+
+        Nothing ->
+            ( { model | page = NotFound }, Cmd.none )
+
+
+
+---- VIEW ----
+
+
+view : Model -> Browser.Document Msg
+view model =
+    let
+        content =
+            case model.page of
+                HomePage homeModel ->
+                    Home.view homeModel
+                        |> Html.map GotHomeMsg
+
+                NotFound ->
+                    text "Page not found."
+    in
+    { title = "elm-manga"
+    , body = [ pageFrame content ]
+    }
+
+
+pageFrame : Html Msg -> Html Msg
+pageFrame content =
+    div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
+        [ div [ class "w-9/12" ]
+            [ pageHeader
+            , content
+            ]
+        ]
+
+
+pageHeader : Html Msg
+pageHeader =
+    h1 [ class "text-center mt-9 text-3xl 2xl:text-4xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
 
 
 
@@ -114,122 +148,3 @@ update msg model =
 subscriptions : Model -> Sub Msg
 subscriptions _ =
     Sub.none
-
-
-
----- VIEW ----
-
-
-view : Model -> Browser.Document Msg
-view model =
-    case model.route of
-        Just (Home searchTerm) ->
-            baseLayout model.isLoading searchTerm model.data
-
-        Just NotFound ->
-            { title = "elm-manga", body = [ div [] [ text "Invalid route" ] ] }
-
-        Nothing ->
-            { title = "elm-manga", body = [ div [] [ text "Invalid route" ] ] }
-
-
-
--- View functions
-
-
-baseLayout : Bool -> Maybe String -> MangaData -> Browser.Document Msg
-baseLayout isLoading searchTerm mangaData =
-    { title = "elm-manga"
-    , body =
-        [ div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
-            [ if isLoading then
-                div [] [ loadingSpinner ]
-
-              else
-                div [] [ siteTitle, filters searchTerm, displayMangaList mangaData ]
-            ]
-        ]
-    }
-
-
-siteTitle : Html Msg
-siteTitle =
-    h1 [ class "text-center mt-2 text-3xl 2xl:text-4xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
-
-
-filters : Maybe String -> Html Msg
-filters searchTerm =
-    div [ class "flex justify-start mt-10 mx-16" ] [ searchFilter searchTerm ]
-
-
-searchFilter : Maybe String -> Html Msg
-searchFilter searchTerm =
-    div []
-        [ div [ class "text-gray-700 font-bold" ] [ text "Search" ]
-        , div []
-            [ form []
-                [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] [ text (Maybe.withDefault "" searchTerm) ]
-                ]
-            ]
-        ]
-
-
-loadingSpinner : Html Msg
-loadingSpinner =
-    div [ class "flex items-center h-full" ]
-        [ Loading.render
-            Circle
-            { defaultConfig | color = "#333" }
-            Loading.On
-        ]
-
-
-displayMangaList : MangaData -> Html Msg
-displayMangaList response =
-    case response of
-        Loading ->
-            loadingSpinner
-
-        NotAsked ->
-            text "Not asked"
-
-        Failure _ ->
-            text "Failed to fetch list of manga's"
-
-        Success resp ->
-            case resp of
-                Just pageOfManga ->
-                    div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6" ]
-                        (List.map displayManga (sanitizeMangaList pageOfManga.manga))
-
-                Nothing ->
-                    text "No manga's to display"
-
-
-displayManga : Manga -> Html Msg
-displayManga manga =
-    a [ href ("https://anilist.co/manga/" ++ String.fromInt manga.id) ]
-        [ div [ class "w-48 h-80 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:text-indigo-900 hover:shadow-2xl" ]
-            [ img [ src (sanitizeCoverImage manga.coverImage), class "h-64 w-full" ]
-                []
-            , div
-                []
-                [ p [ class "text-l font-bold hover:font-black truncate mx-2 mt-1 mb-1" ] [ text (sanitizeTitle manga.title) ]
-                , displayGenres (sanitizeGenres manga.genres)
-                ]
-            ]
-        ]
-
-
-displayGenres : List String -> Html Msg
-displayGenres genres =
-    let
-        firstTwoGenres =
-            List.take 2 genres
-    in
-    if List.length firstTwoGenres /= 2 then
-        span [ class "px-2 text-md font-semibold text-gray-700 mr-1 mb-1" ] [ text "No genres" ]
-
-    else
-        div [ class "mx-2" ]
-            (List.map (\genre -> span [ class "inline-block bg-blue-200 rounded-full px-2 text-xs font-semibold text-gray-700 mr-1 mb-1" ] [ text genre ]) firstTwoGenres)

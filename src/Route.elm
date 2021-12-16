@@ -9,7 +9,6 @@ import Url.Parser.Query
 
 type Route
     = Home (Maybe String)
-    | NotFound
 
 
 parser : Url.Parser.Parser (Route -> a) a
@@ -18,9 +17,9 @@ parser =
         [ Url.Parser.map Home <| Url.Parser.top <?> Url.Parser.Query.string "search" ]
 
 
-fromUrl : Url.Url -> Route
+fromUrl : Url.Url -> Maybe Route
 fromUrl url =
-    Maybe.withDefault NotFound (Url.Parser.parse parser url)
+    Url.Parser.parse parser url
 
 
 setQueryParam : Nav.Key -> String -> Cmd msg
