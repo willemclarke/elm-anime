@@ -3,9 +3,10 @@ module Home exposing (..)
 import Api
 import Browser.Navigation
 import Graphql.Http
+import Graphql.OptionalArgument exposing (fromMaybe)
 import Html exposing (..)
-import Html.Attributes exposing (class, href, placeholder, src, type_)
-import Html.Events exposing (onInput)
+import Html.Attributes exposing (class, href, name, placeholder, src, type_, value)
+import Html.Events exposing (on, onInput)
 import Loading
     exposing
         ( LoaderType(..)
@@ -20,20 +21,29 @@ import Route
 
 
 type alias Model =
-    { data : Api.MangaData, isLoading : Bool, searchTerm : Maybe String, key : Browser.Navigation.Key }
+    { data : Api.MangaData, searchTerm : Maybe String, key : Browser.Navigation.Key }
 
 
-init : Maybe String -> Browser.Navigation.Key -> ( Model, Cmd Msg )
-init searchTerm navKey =
-    ( { data = RemoteData.Loading, isLoading = True, searchTerm = searchTerm, key = navKey }, makeRequest searchTerm )
+init : Route.FilterQueryParams -> Browser.Navigation.Key -> ( Model, Cmd Msg )
+init queryParams navKey =
+    ( { data = RemoteData.Loading, searchTerm = Nothing, key = navKey }, makeRequest queryParams )
 
 
-makeRequest : Maybe String -> Cmd Msg
-makeRequest searchTerm =
-    searchTerm
+makeRequest : Route.FilterQueryParams -> Cmd Msg
+makeRequest queryParams =
+    transformParams queryParams
         |> Api.query
         |> Graphql.Http.queryRequest "https://graphql.anilist.co/"
         |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
+
+
+
+-- function to convert /?query="x"&genre="y" to Present/Absent of x/y
+
+
+transformParams : Route.FilterQueryParams -> Api.Filter
+transformParams filterQueryPrams =
+    { search = fromMaybe filterQueryPrams.search, genre = fromMaybe filterQueryPrams.genre }
 
 
 
@@ -43,20 +53,20 @@ makeRequest searchTerm =
 type Msg
     = GotResponse Api.MangaData
     | ChangeInput String
-    | IsLoading
+    | ChangeGenre String
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
-        IsLoading ->
-            ( { model | isLoading = True }, Cmd.none )
-
         GotResponse resp ->
-            ( { model | data = resp, isLoading = False }, Cmd.none )
+            ( { model | data = resp }, Cmd.none )
 
         ChangeInput newInput ->
-            ( { model | data = RemoteData.Loading }, Route.setQueryParam model.key newInput )
+            ( { model | data = RemoteData.Loading, searchTerm = Just newInput }, Route.setSearchParam model.key newInput )
+
+        ChangeGenre genre ->
+            ( { model | data = RemoteData.Loading }, Route.setGenreParam model.key genre )
 
 
 
@@ -75,24 +85,48 @@ homeFrame searchTerm mangaData =
 
 filters : Maybe String -> Html Msg
 filters searchTerm =
-    div [ class "flex justify-start mt-10 mx-16" ] [ searchFilter searchTerm ]
-
-
-searchFilter : Maybe String -> Html Msg
-searchFilter searchTerm =
-    div []
-        [ div [ class "text-gray-700 font-bold" ] [ text "Search" ]
-        , div []
-            [ form []
-                [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ] [ text (Maybe.withDefault "" searchTerm) ]
-                ]
+    div [ class "flex mt-10 mx-16 " ]
+        [ form [ class "flex" ]
+            [ searchFilter searchTerm
+            , genreFilter
             ]
         ]
 
 
+searchFilter : Maybe String -> Html Msg
+searchFilter searchTerm =
+    div [ class "mr-9" ]
+        [ div [ class "text-gray-700 font-bold" ] [ text "Search" ]
+        , div []
+            [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ]
+                [ text (Maybe.withDefault "" searchTerm) ]
+            ]
+        ]
+
+
+genreFilter : Html Msg
+genreFilter =
+    let
+        options =
+            List.map (\genre -> option [ value genre ] [ text genre ]) listOfGenres
+    in
+    div []
+        [ div [ class "text-gray-700 font-bold" ] [ text "Genres" ]
+        , div []
+            [ select [ name "genres", class "mt-1 p-2 rounded shadow-l text-gray-700 bg-white", onInput ChangeGenre ]
+                options
+            ]
+        ]
+
+
+listOfGenres : List String
+listOfGenres =
+    [ "Action", "Adventure", "Comedy", "Drama", "Psychological", "Romance", "Fantasy", "Horror" ]
+
+
 loadingSpinner : Html Msg
 loadingSpinner =
-    div [ class "flex h-full justify-center items-center" ]
+    div [ class "flex h-full justify-center items-center mt-8" ]
         [ Loading.render
             Circle
             { defaultConfig | color = "#333" }

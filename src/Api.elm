@@ -1,4 +1,4 @@
-module Api exposing (Manga, MangaData, query, sanitizeAverageScore, sanitizeCoverImage, sanitizeGenres, sanitizeMangaList, sanitizeTitle)
+module Api exposing (Filter, Manga, MangaData, query, sanitizeAverageScore, sanitizeCoverImage, sanitizeGenres, sanitizeMangaList, sanitizeTitle)
 
 import AniList.Enum.MediaSort
 import AniList.Enum.MediaType
@@ -41,18 +41,22 @@ type alias CoverImage =
     { large : Maybe String }
 
 
-query : Maybe String -> SelectionSet (Maybe Page) RootQuery
-query searchTerm =
-    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 100 }) (pageSelection searchTerm)
+type alias Filter =
+    { search : OptionalArgument String, genre : OptionalArgument String }
+
+
+query : Filter -> SelectionSet (Maybe Page) RootQuery
+query filter =
+    Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 100 }) (pageSelection filter)
 
 
 
 -- helpers to handle Maybe's, which this api's schema was rife with
 
 
-pageSelection : Maybe String -> SelectionSet Page AniList.Object.Page
-pageSelection searchTerm =
-    SelectionSet.map Page (Page.media (\optionals -> { optionals | type_ = Present AniList.Enum.MediaType.Manga, sort = Present [ Just AniList.Enum.MediaSort.ScoreDesc ], isAdult = Present False, search = fromMaybe searchTerm }) mediaSelection)
+pageSelection : Filter -> SelectionSet Page AniList.Object.Page
+pageSelection { search, genre } =
+    SelectionSet.map Page (Page.media (\optionals -> { optionals | search = search, genre = genre, type_ = Present AniList.Enum.MediaType.Manga, sort = Present [ Just AniList.Enum.MediaSort.ScoreDesc ], isAdult = Present False }) mediaSelection)
 
 
 mediaSelection : SelectionSet Manga AniList.Object.Media

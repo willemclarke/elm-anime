@@ -8,6 +8,7 @@ import Html.Attributes exposing (class, href)
 import Loading
     exposing
         ( LoaderType(..)
+        , defaultConfig
         )
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route(..))
@@ -83,23 +84,23 @@ update message model =
         GotHomeMsg homeMsg ->
             case model.page of
                 HomePage homeModel ->
-                    toHome Nothing model (Home.update homeMsg homeModel)
+                    toHome model (Home.update homeMsg homeModel)
 
                 NotFound ->
                     ( model, Cmd.none )
 
 
-toHome : Maybe String -> Model -> ( Home.Model, Cmd Home.Msg ) -> ( Model, Cmd Msg )
-toHome searchTerm model ( home, cmds ) =
-    ( { model | page = HomePage { home | searchTerm = searchTerm } }, Cmd.map GotHomeMsg cmds )
+toHome : Model -> ( Home.Model, Cmd Home.Msg ) -> ( Model, Cmd Msg )
+toHome model ( home, cmds ) =
+    ( { model | page = HomePage home }, Cmd.map GotHomeMsg cmds )
 
 
 updateUrl : Url.Url -> Model -> ( Model, Cmd Msg )
 updateUrl url model =
     case Route.fromUrl url of
-        Just (Route.Home queryStr) ->
-            Home.init queryStr model.key
-                |> toHome queryStr model
+        Just (Route.Home params) ->
+            Home.init params model.key
+                |> toHome model
 
         Nothing ->
             ( { model | page = NotFound }, Cmd.none )
@@ -129,7 +130,7 @@ view model =
 pageFrame : Html Msg -> Html Msg
 pageFrame content =
     div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
-        [ div [ class "w-9/12" ]
+        [ div [ class "w:xl-9/12" ]
             [ pageHeader
             , content
             ]
