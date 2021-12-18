@@ -8,7 +8,6 @@ import Html.Attributes exposing (class, href)
 import Loading
     exposing
         ( LoaderType(..)
-        , defaultConfig
         )
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route(..))
@@ -49,12 +48,6 @@ type Page
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url navKey =
     updateUrl url { page = NotFound, key = navKey }
-
-
-sendMsg : msg -> Cmd msg
-sendMsg msg =
-    Task.succeed msg
-        |> Task.perform identity
 
 
 

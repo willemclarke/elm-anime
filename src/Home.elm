@@ -3,7 +3,6 @@ module Home exposing (..)
 import Api
 import Browser.Navigation
 import Graphql.Http
-import Graphql.OptionalArgument as GqlOptional
 import Html exposing (..)
 import Html.Attributes exposing (class, href, name, placeholder, src, type_, value)
 import Html.Events exposing (on, onInput)
@@ -12,8 +11,10 @@ import Loading
         ( LoaderType(..)
         , defaultConfig
         )
+import Process
 import RemoteData exposing (RemoteData(..))
 import Route
+import Task
 
 
 
@@ -25,21 +26,16 @@ type alias Model =
 
 
 init : Route.FilterQueryParams -> Browser.Navigation.Key -> ( Model, Cmd Msg )
-init queryParams navKey =
-    ( { key = navKey, data = RemoteData.Loading, searchTerm = queryParams.search, genre = queryParams.genre }, makeRequest queryParams )
+init params navKey =
+    ( { key = navKey, data = RemoteData.Loading, searchTerm = params.search, genre = params.genre }, fetchManga params )
 
 
-makeRequest : Route.FilterQueryParams -> Cmd Msg
-makeRequest queryParams =
-    transformParams queryParams
+fetchManga : Route.FilterQueryParams -> Cmd Msg
+fetchManga queryParams =
+    Route.transformParams queryParams
         |> Api.query
         |> Graphql.Http.queryRequest "https://graphql.anilist.co/"
         |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
-
-
-transformParams : Route.FilterQueryParams -> Api.Filter
-transformParams filterQueryPrams =
-    { search = GqlOptional.fromMaybe filterQueryPrams.search, genre = GqlOptional.fromMaybe filterQueryPrams.genre }
 
 
 
@@ -59,10 +55,23 @@ update msg model =
             ( { model | data = resp }, Cmd.none )
 
         ChangeInput newInput ->
-            ( { model | data = RemoteData.Loading, searchTerm = Just newInput }, Route.setFilterParams model.key { search = Just newInput, genre = model.genre } )
+            let
+                searchTerm =
+                    if String.isEmpty newInput then
+                        Nothing
+
+                    else
+                        Just newInput
+            in
+            ( { model | data = RemoteData.Loading, searchTerm = searchTerm }, Route.addFilterParams model.key { search = searchTerm, genre = model.genre } )
 
         ChangeGenre genre ->
-            ( { model | data = RemoteData.Loading }, Route.setFilterParams model.key { search = model.searchTerm, genre = Just genre } )
+            ( { model | data = RemoteData.Loading, genre = Just genre }, Route.addFilterParams model.key { search = model.searchTerm, genre = Just genre } )
+
+
+delayMsg : msg -> Cmd msg
+delayMsg msg =
+    Task.perform (always msg) (Process.sleep 1000)
 
 
 
@@ -76,12 +85,15 @@ view model =
 
 homeFrame : Maybe String -> Api.MangaData -> Html Msg
 homeFrame searchTerm mangaData =
-    div [] [ filters searchTerm, displayMangaList mangaData ]
+    div []
+        [ filters searchTerm
+        , displayMangaList mangaData
+        ]
 
 
 filters : Maybe String -> Html Msg
 filters searchTerm =
-    div [ class "flex mt-10 mx-16 " ]
+    div [ class "flex mt-10 mx-16" ]
         [ form [ class "flex" ]
             [ searchFilter searchTerm
             , genreFilter
@@ -94,7 +106,7 @@ searchFilter searchTerm =
     div [ class "mr-9" ]
         [ div [ class "text-gray-700 font-bold" ] [ text "Search" ]
         , div []
-            [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 ", placeholder "Search manga", type_ "search", onInput ChangeInput ]
+            [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 h-10", placeholder "Search manga", type_ "search", onInput ChangeInput ]
                 [ text (Maybe.withDefault "" searchTerm) ]
             ]
         ]
@@ -109,7 +121,7 @@ genreFilter =
     div []
         [ div [ class "text-gray-700 font-bold" ] [ text "Genres" ]
         , div []
-            [ select [ name "genres", class "mt-1 p-2 rounded shadow-l text-gray-700 bg-white", onInput ChangeGenre ]
+            [ select [ name "genres", class "h-10 mt-1 p-2 rounded shadow-l text-gray-700 bg-white", onInput ChangeGenre ]
                 options
             ]
         ]
@@ -117,7 +129,7 @@ genreFilter =
 
 listOfGenres : List String
 listOfGenres =
-    [ "Action", "Adventure", "Comedy", "Drama", "Psychological", "Romance", "Fantasy", "Horror" ]
+    List.sort [ "Action", "Adventure", "Comedy", "Drama", "Psychological", "Romance", "Fantasy", "Horror", "Slice of Life", "Sci-Fi", "Mystery", "Mecha" ]
 
 
 loadingSpinner : Html Msg
@@ -155,12 +167,12 @@ displayMangaList response =
 displayManga : Api.Manga -> Html Msg
 displayManga manga =
     a [ href ("https://anilist.co/manga/" ++ String.fromInt manga.id) ]
-        [ div [ class "w-48 h-90 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:text-indigo-900 hover:shadow-2xl" ]
+        [ div [ class "w-48 h-90 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:text-indigo-900 hover:shadow-2xl hover:underline" ]
             [ img [ src (Api.sanitizeCoverImage manga.coverImage), class "h-64 w-full" ]
                 []
             , div
                 []
-                [ p [ class "hover:underline text-l font-bold truncate mx-2 mt-1" ] [ text (Api.sanitizeTitle manga.title) ]
+                [ p [ class "text-l font-bold truncate mx-2 mt-1" ] [ text (Api.sanitizeTitle manga.title) ]
                 , displayGenres (Api.sanitizeGenres manga.genres)
                 ]
             ]
@@ -179,5 +191,5 @@ displayGenres genres =
             ]
 
     else
-        div [ class "mx-2 my-1" ]
+        div [ class "mx-2 mt-1 mb-2" ]
             (List.map (\genre -> span [ class "inline-block bg-blue-300 rounded-full px-2 text-xs font-semibold text-gray-700 mr-2" ] [ text genre ]) firstTwoGenres)

@@ -50,10 +50,6 @@ query filter =
     Query.page (\optionals -> { optionals | page = Present 1, perPage = Present 100 }) (pageSelection filter)
 
 
-
--- helpers to handle Maybe's, which this api's schema was rife with
-
-
 pageSelection : Filter -> SelectionSet Page AniList.Object.Page
 pageSelection { search, genre } =
     SelectionSet.map Page (Page.media (\optionals -> { optionals | search = search, genre = genre, type_ = Present AniList.Enum.MediaType.Manga, sort = Present [ Just AniList.Enum.MediaSort.ScoreDesc ], isAdult = Present False }) mediaSelection)
@@ -80,6 +76,10 @@ coverImageSelection : SelectionSet CoverImage AniList.Object.MediaCoverImage
 coverImageSelection =
     SelectionSet.map CoverImage
         CoverImage.large
+
+
+
+-- helpers to handle Maybe's, which this api's schema was rife with
 
 
 sanitizeMangaList : Maybe (List (Maybe Manga)) -> List Manga
