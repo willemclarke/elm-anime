@@ -1,10 +1,11 @@
-module Route exposing (FilterQueryParams, Route(..), fromUrl, parser, setGenreParam, setSearchParam)
+module Route exposing (FilterQueryParams, Route(..), fromUrl, parser, setFilterParams)
 
 import Browser.Navigation as Nav
-import Url exposing (Url)
-import Url.Builder exposing (Root(..))
+import Maybe.Extra
+import Url
+import Url.Builder as Builder
 import Url.Parser exposing ((</>), (<?>))
-import Url.Parser.Query
+import Url.Parser.Query as Query
 
 
 type Route
@@ -20,12 +21,7 @@ type alias FilterQueryParams =
 parser : Url.Parser.Parser (Route -> a) a
 parser =
     Url.Parser.oneOf
-        [ Url.Parser.map Home <| Url.Parser.top <?> queryParams ]
-
-
-queryParams : Url.Parser.Query.Parser FilterQueryParams
-queryParams =
-    Url.Parser.Query.map2 FilterQueryParams (Url.Parser.Query.string "search") (Url.Parser.Query.string "genre")
+        [ Url.Parser.map Home <| Url.Parser.top <?> filterQueryParams ]
 
 
 fromUrl : Url.Url -> Maybe Route
@@ -33,11 +29,16 @@ fromUrl url =
     Url.Parser.parse parser url
 
 
-setSearchParam : Nav.Key -> String -> Cmd msg
-setSearchParam key searchTerm =
-    Nav.replaceUrl key <| Url.Builder.relative [] [ Url.Builder.string "search" searchTerm ]
+filterQueryParams : Query.Parser FilterQueryParams
+filterQueryParams =
+    Query.map2 FilterQueryParams (Query.string "search") (Query.string "genre")
 
 
-setGenreParam : Nav.Key -> String -> Cmd msg
-setGenreParam key genre =
-    Nav.replaceUrl key <| Url.Builder.relative [] [ Url.Builder.string "genre" genre ]
+setFilterParams : Nav.Key -> FilterQueryParams -> Cmd msg
+setFilterParams key params =
+    Nav.replaceUrl key <| Builder.relative [] (parseParams params)
+
+
+parseParams : FilterQueryParams -> List Builder.QueryParameter
+parseParams { search, genre } =
+    Maybe.Extra.values [ Maybe.map (Builder.string "search") search, Maybe.map (Builder.string "genre") genre ]
