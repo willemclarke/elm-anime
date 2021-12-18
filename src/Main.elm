@@ -120,7 +120,7 @@ view model =
                         |> Html.map GotHomeMsg
 
                 NotFound ->
-                    text "Page not found."
+                    pageNotFound
     in
     { title = "elm-manga"
     , body = [ pageFrame content ]
@@ -140,6 +140,11 @@ pageFrame content =
 pageHeader : Html Msg
 pageHeader =
     h1 [ class "text-center mt-9 text-3xl 2xl:text-4xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
+
+
+pageNotFound : Html Msg
+pageNotFound =
+    h1 [ class "mt-4 text-lg font-bold text-gray-700" ] [ text "Sorry, this page doesn't exist :(" ]
 
 
 
