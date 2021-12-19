@@ -52,7 +52,19 @@ query filter =
 
 pageSelection : Filter -> SelectionSet Page AniList.Object.Page
 pageSelection { search, genre } =
-    SelectionSet.map Page (Page.media (\optionals -> { optionals | search = search, genre = genre, type_ = Present AniList.Enum.MediaType.Manga, sort = Present [ Just AniList.Enum.MediaSort.ScoreDesc ], isAdult = Present False }) mediaSelection)
+    SelectionSet.map Page
+        (Page.media
+            (\optionals ->
+                { optionals
+                    | search = search
+                    , genre = genre
+                    , type_ = Present AniList.Enum.MediaType.Manga
+                    , sort = Present [ Just AniList.Enum.MediaSort.ScoreDesc ]
+                    , isAdult = Present False
+                }
+            )
+            mediaSelection
+        )
 
 
 mediaSelection : SelectionSet Manga AniList.Object.Media
