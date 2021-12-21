@@ -137,7 +137,7 @@ pageFrame isLoading content =
 
 pageHeader : Html Msg
 pageHeader =
-    h1 [ class "text-center mt-9 text-3xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
+    h1 [ class "text-center mt-9 pb-2 text-5xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
 
 
 pageNotFound : Html Msg
@@ -147,10 +147,10 @@ pageNotFound =
 
 loadingSpinner : Html Msg
 loadingSpinner =
-    div [ class "flex h-full justify-center items-center mt-8" ]
+    div [ class "flex h-full justify-center items-center" ]
         [ Loading.render
             Circle
-            { defaultConfig | color = "#333" }
+            { defaultConfig | color = "#1d4ed8", size = 40 }
             Loading.On
         ]
 

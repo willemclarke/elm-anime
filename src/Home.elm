@@ -96,7 +96,7 @@ view model =
 
 homeFrame : Maybe String -> Api.MangaData -> Html Msg
 homeFrame searchTerm mangaData =
-    div []
+    div [ class "h-full" ]
         [ filters searchTerm
         , displayMangaList mangaData
         ]
@@ -104,7 +104,7 @@ homeFrame searchTerm mangaData =
 
 filters : Maybe String -> Html Msg
 filters searchTerm =
-    div [ class "mt-10 mx-16" ]
+    div [ class "mt-14 mx-16" ]
         [ form [ onSubmit OnSubmit, class "flex" ]
             [ searchFilter searchTerm
             , genreFilter
@@ -159,21 +159,13 @@ diverseSortFilter =
         ]
 
 
-loadingSpinner : Html Msg
-loadingSpinner =
-    div [ class "flex h-full justify-center items-center mt-8" ]
-        [ Loading.render
-            Circle
-            { defaultConfig | color = "#333" }
-            Loading.On
-        ]
-
-
 displayMangaList : Api.MangaData -> Html Msg
 displayMangaList response =
     case response of
         Loading ->
-            loadingSpinner
+            div [ class "flex h-full justify-center items-center" ]
+                [ loadingSpinner
+                ]
 
         NotAsked ->
             text "Not asked"
@@ -220,3 +212,13 @@ displayGenres genres =
     else
         div [ class "mx-2 mt-1 mb-2" ]
             (List.map (\genre -> span [ class "inline-block bg-blue-300 rounded-full px-2 text-xs font-semibold text-gray-700 mr-2" ] [ text genre ]) firstTwoGenres)
+
+
+loadingSpinner : Html Msg
+loadingSpinner =
+    div [ class "mb-96" ]
+        [ Loading.render
+            Circle
+            { defaultConfig | color = "#1d4ed8", size = 40 }
+            Loading.On
+        ]
