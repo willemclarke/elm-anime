@@ -4,8 +4,8 @@ import Api
 import Browser.Navigation
 import Graphql.Http
 import Html exposing (..)
-import Html.Attributes exposing (class, href, name, placeholder, src, type_, value)
-import Html.Events exposing (on, onInput)
+import Html.Attributes exposing (class, href, name, placeholder, selected, src, type_, value)
+import Html.Events exposing (onInput, onSubmit)
 import Loading
     exposing
         ( LoaderType(..)
@@ -14,7 +14,6 @@ import Loading
 import Process
 import RemoteData exposing (RemoteData(..))
 import Route
-import Task
 
 
 
@@ -22,12 +21,16 @@ import Task
 
 
 type alias Model =
-    { key : Browser.Navigation.Key, data : Api.MangaData, searchTerm : Maybe String, genre : Maybe String }
+    { key : Browser.Navigation.Key, data : Api.MangaData, searchTerm : Maybe String, mediaType : Maybe String, genre : Maybe String, sort : Maybe String }
+
+
+type alias SelectOption =
+    { value : String, text : String }
 
 
 init : Route.FilterQueryParams -> Browser.Navigation.Key -> ( Model, Cmd Msg )
 init params navKey =
-    ( { key = navKey, data = RemoteData.Loading, searchTerm = params.search, genre = params.genre }, fetchManga params )
+    ( { key = navKey, data = RemoteData.Loading, searchTerm = params.search, mediaType = params.mediaType, genre = params.genre, sort = params.sort }, fetchManga params )
 
 
 fetchManga : Route.FilterQueryParams -> Cmd Msg
@@ -45,7 +48,10 @@ fetchManga queryParams =
 type Msg
     = GotResponse Api.MangaData
     | ChangeInput String
+    | ChangeMediaType String
     | ChangeGenre String
+    | ChangeSortOption String
+    | OnSubmit
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -63,15 +69,31 @@ update msg model =
                     else
                         Just newInput
             in
-            ( { model | data = RemoteData.Loading, searchTerm = searchTerm }, Route.addFilterParams model.key { search = searchTerm, genre = model.genre } )
+            ( { model | searchTerm = searchTerm }, Cmd.none )
+
+        ChangeMediaType mediaType ->
+            ( { model | data = RemoteData.Loading, mediaType = Just mediaType }
+            , Route.addFilterParams model.key
+                { mediaType = Just mediaType, search = model.searchTerm, genre = model.genre, sort = model.sort }
+            )
+
+        OnSubmit ->
+            ( { model | data = RemoteData.Loading }
+            , Route.addFilterParams model.key
+                { search = model.searchTerm, mediaType = model.mediaType, genre = model.genre, sort = model.sort }
+            )
 
         ChangeGenre genre ->
-            ( { model | data = RemoteData.Loading, genre = Just genre }, Route.addFilterParams model.key { search = model.searchTerm, genre = Just genre } )
+            ( { model | data = RemoteData.Loading, genre = Just genre }
+            , Route.addFilterParams model.key
+                { genre = Just genre, search = model.searchTerm, mediaType = model.mediaType, sort = model.sort }
+            )
 
-
-delayMsg : msg -> Cmd msg
-delayMsg msg =
-    Task.perform (always msg) (Process.sleep 1000)
+        ChangeSortOption option ->
+            ( { model | data = RemoteData.Loading, sort = Just option }
+            , Route.addFilterParams model.key
+                { sort = Just option, search = model.searchTerm, mediaType = model.mediaType, genre = model.genre }
+            )
 
 
 
@@ -85,18 +107,24 @@ view model =
 
 homeFrame : Maybe String -> Api.MangaData -> Html Msg
 homeFrame searchTerm mangaData =
-    div []
+    div [ class "flex flex-col h-full" ]
         [ filters searchTerm
         , displayMangaList mangaData
         ]
 
 
+
+-- filter view functions
+
+
 filters : Maybe String -> Html Msg
 filters searchTerm =
-    div [ class "flex mt-10 mx-16" ]
-        [ form [ class "flex" ]
+    div [ class "mt-14 mx-16" ]
+        [ form [ onSubmit OnSubmit, class "flex justify-center" ]
             [ searchFilter searchTerm
+            , mediaTypeFiler
             , genreFilter
+            , diverseSortFilter
             ]
         ]
 
@@ -112,13 +140,33 @@ searchFilter searchTerm =
         ]
 
 
+mediaTypeFiler : Html Msg
+mediaTypeFiler =
+    let
+        options =
+            List.map (\mediaType -> option [ value mediaType.value ] [ text mediaType.text ]) mediaTypeOptions
+    in
+    div [ class "mr-9" ]
+        [ div [ class "text-gray-700 font-bold" ] [ text "Type" ]
+        , div []
+            [ select [ name "genres", class "h-10 mt-1 p-2 rounded shadow-l text-gray-700 bg-white", onInput ChangeMediaType ]
+                options
+            ]
+        ]
+
+
+mediaTypeOptions : List SelectOption
+mediaTypeOptions =
+    [ { value = "ANIME", text = "Anime" }, { value = "MANGA", text = "Manga" } ]
+
+
 genreFilter : Html Msg
 genreFilter =
     let
         options =
             List.map (\genre -> option [ value genre ] [ text genre ]) listOfGenres
     in
-    div []
+    div [ class "mr-9" ]
         [ div [ class "text-gray-700 font-bold" ] [ text "Genres" ]
         , div []
             [ select [ name "genres", class "h-10 mt-1 p-2 rounded shadow-l text-gray-700 bg-white", onInput ChangeGenre ]
@@ -129,24 +177,56 @@ genreFilter =
 
 listOfGenres : List String
 listOfGenres =
-    List.sort [ "Action", "Adventure", "Comedy", "Drama", "Psychological", "Romance", "Fantasy", "Horror", "Slice of Life", "Sci-Fi", "Mystery", "Mecha" ]
-
-
-loadingSpinner : Html Msg
-loadingSpinner =
-    div [ class "flex h-full justify-center items-center mt-8" ]
-        [ Loading.render
-            Circle
-            { defaultConfig | color = "#333" }
-            Loading.On
+    List.sort
+        [ "Action"
+        , "Adventure"
+        , "Comedy"
+        , "Drama"
+        , "Psychological"
+        , "Romance"
+        , "Fantasy"
+        , "Horror"
+        , "Slice of Life"
+        , "Sci-Fi"
+        , "Mystery"
+        , "Mecha"
         ]
+
+
+diverseSortFilter : Html Msg
+diverseSortFilter =
+    let
+        options =
+            List.map (\diverseOption -> option [ value diverseOption.value ] [ text diverseOption.text ]) diverseSortOptions
+    in
+    div []
+        [ div [ class "text-gray-700 font-bold" ] [ text "Sort" ]
+        , div []
+            [ select [ name "sort", class "h-10 mt-1 p-2 rounded shadow-l text-gray-700 bg-white", onInput ChangeSortOption ]
+                options
+            ]
+        ]
+
+
+diverseSortOptions : List SelectOption
+diverseSortOptions =
+    [ { value = "TRENDING_DESC", text = "Trending" }
+    , { value = "POPULARITY_DESC", text = "Popular" }
+    , { value = "SCORE_DESC", text = "Score Descending" }
+    ]
+
+
+
+-- manga view functions
 
 
 displayMangaList : Api.MangaData -> Html Msg
 displayMangaList response =
     case response of
         Loading ->
-            loadingSpinner
+            div [ class "flex h-full justify-center items-center" ]
+                [ loadingSpinner
+                ]
 
         NotAsked ->
             text "Not asked"
@@ -157,8 +237,10 @@ displayMangaList response =
         Success resp ->
             case resp of
                 Just pageOfManga ->
-                    div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6" ]
-                        (List.map displayManga (Api.sanitizeMangaList pageOfManga.manga))
+                    div [ class "flex justify-center" ]
+                        [ div [ class "mx-16 mt-10 mb-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-x-10 gap-y-8" ]
+                            (List.map displayManga (Api.sanitizeMangaList pageOfManga.manga))
+                        ]
 
                 Nothing ->
                     text "No manga's to display"
@@ -167,12 +249,12 @@ displayMangaList response =
 displayManga : Api.Manga -> Html Msg
 displayManga manga =
     a [ href ("https://anilist.co/manga/" ++ String.fromInt manga.id) ]
-        [ div [ class "w-48 h-90 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:text-indigo-900 hover:shadow-2xl hover:underline" ]
+        [ div [ class "w-48 h-90 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:text-indigo-900 hover:shadow-2xl" ]
             [ img [ src (Api.sanitizeCoverImage manga.coverImage), class "h-64 w-full" ]
                 []
             , div
                 []
-                [ p [ class "text-l font-bold truncate mx-2 mt-1" ] [ text (Api.sanitizeTitle manga.title) ]
+                [ p [ class "text-l font-bold truncate mx-2 mt-1 hover:underline" ] [ text (Api.sanitizeTitle manga.title) ]
                 , displayGenres (Api.sanitizeGenres manga.genres)
                 ]
             ]
@@ -186,10 +268,20 @@ displayGenres genres =
             List.take 2 genres
     in
     if List.length firstTwoGenres /= 2 then
-        div [ class "mt-1 my-1" ]
+        div [ class "my-1.5" ]
             [ span [ class "mx-2 text-md font-semibold text-gray-700" ] [ text "No genres" ]
             ]
 
     else
         div [ class "mx-2 mt-1 mb-2" ]
             (List.map (\genre -> span [ class "inline-block bg-blue-300 rounded-full px-2 text-xs font-semibold text-gray-700 mr-2" ] [ text genre ]) firstTwoGenres)
+
+
+loadingSpinner : Html Msg
+loadingSpinner =
+    div [ class "mb-96" ]
+        [ Loading.render
+            Circle
+            { defaultConfig | color = "#1d4ed8", size = 40 }
+            Loading.On
+        ]
