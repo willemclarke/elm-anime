@@ -5,7 +5,7 @@ import Browser.Navigation
 import Graphql.Http
 import Html exposing (..)
 import Html.Attributes exposing (class, href, name, placeholder, src, type_, value)
-import Html.Events exposing (on, onInput)
+import Html.Events exposing (onInput, onSubmit)
 import Loading
     exposing
         ( LoaderType(..)
@@ -14,7 +14,6 @@ import Loading
 import Process
 import RemoteData exposing (RemoteData(..))
 import Route
-import Task
 
 
 
@@ -46,6 +45,7 @@ type Msg
     = GotResponse Api.MangaData
     | ChangeInput String
     | ChangeGenre String
+    | OnSubmit
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -63,15 +63,13 @@ update msg model =
                     else
                         Just newInput
             in
-            ( { model | data = RemoteData.Loading, searchTerm = searchTerm }, Route.addFilterParams model.key { search = searchTerm, genre = model.genre } )
+            ( { model | searchTerm = searchTerm }, Cmd.none )
+
+        OnSubmit ->
+            ( { model | data = RemoteData.Loading }, Route.addFilterParams model.key { search = model.searchTerm, genre = model.genre } )
 
         ChangeGenre genre ->
             ( { model | data = RemoteData.Loading, genre = Just genre }, Route.addFilterParams model.key { search = model.searchTerm, genre = Just genre } )
-
-
-delayMsg : msg -> Cmd msg
-delayMsg msg =
-    Task.perform (always msg) (Process.sleep 1000)
 
 
 
@@ -94,7 +92,7 @@ homeFrame searchTerm mangaData =
 filters : Maybe String -> Html Msg
 filters searchTerm =
     div [ class "mt-10 mx-16" ]
-        [ form [ class "flex" ]
+        [ form [ onSubmit OnSubmit, class "flex" ]
             [ searchFilter searchTerm
             , genreFilter
             ]
@@ -167,12 +165,12 @@ displayMangaList response =
 displayManga : Api.Manga -> Html Msg
 displayManga manga =
     a [ href ("https://anilist.co/manga/" ++ String.fromInt manga.id) ]
-        [ div [ class "w-48 h-90 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:text-indigo-900 hover:shadow-2xl hover:underline" ]
+        [ div [ class "w-48 h-90 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:text-indigo-900 hover:shadow-2xl" ]
             [ img [ src (Api.sanitizeCoverImage manga.coverImage), class "h-64 w-full" ]
                 []
             , div
                 []
-                [ p [ class "text-l font-bold truncate mx-2 mt-1" ] [ text (Api.sanitizeTitle manga.title) ]
+                [ p [ class "text-l font-bold truncate mx-2 mt-1 hover:underline" ] [ text (Api.sanitizeTitle manga.title) ]
                 , displayGenres (Api.sanitizeGenres manga.genres)
                 ]
             ]
@@ -186,7 +184,7 @@ displayGenres genres =
             List.take 2 genres
     in
     if List.length firstTwoGenres /= 2 then
-        div [ class "mt-1 my-1" ]
+        div [ class "my-1.5" ]
             [ span [ class "mx-2 text-md font-semibold text-gray-700" ] [ text "No genres" ]
             ]
 
