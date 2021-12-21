@@ -21,12 +21,16 @@ import Route
 
 
 type alias Model =
-    { key : Browser.Navigation.Key, data : Api.MangaData, searchTerm : Maybe String, genre : Maybe String, sort : Maybe String }
+    { key : Browser.Navigation.Key, data : Api.MangaData, searchTerm : Maybe String, mediaType : Maybe String, genre : Maybe String, sort : Maybe String }
+
+
+type alias SelectOption =
+    { value : String, text : String }
 
 
 init : Route.FilterQueryParams -> Browser.Navigation.Key -> ( Model, Cmd Msg )
 init params navKey =
-    ( { key = navKey, data = RemoteData.Loading, searchTerm = params.search, genre = params.genre, sort = params.sort }, fetchManga params )
+    ( { key = navKey, data = RemoteData.Loading, searchTerm = params.search, mediaType = params.mediaType, genre = params.genre, sort = params.sort }, fetchManga params )
 
 
 fetchManga : Route.FilterQueryParams -> Cmd Msg
@@ -44,6 +48,7 @@ fetchManga queryParams =
 type Msg
     = GotResponse Api.MangaData
     | ChangeInput String
+    | ChangeMediaType String
     | ChangeGenre String
     | ChangeSortOption String
     | OnSubmit
@@ -66,22 +71,28 @@ update msg model =
             in
             ( { model | searchTerm = searchTerm }, Cmd.none )
 
+        ChangeMediaType mediaType ->
+            ( { model | data = RemoteData.Loading, mediaType = Just mediaType }
+            , Route.addFilterParams model.key
+                { mediaType = Just mediaType, search = model.searchTerm, genre = model.genre, sort = model.sort }
+            )
+
         OnSubmit ->
             ( { model | data = RemoteData.Loading }
             , Route.addFilterParams model.key
-                { search = model.searchTerm, genre = model.genre, sort = model.sort }
+                { search = model.searchTerm, mediaType = model.mediaType, genre = model.genre, sort = model.sort }
             )
 
         ChangeGenre genre ->
             ( { model | data = RemoteData.Loading, genre = Just genre }
             , Route.addFilterParams model.key
-                { genre = Just genre, search = model.searchTerm, sort = model.sort }
+                { genre = Just genre, search = model.searchTerm, mediaType = model.mediaType, sort = model.sort }
             )
 
         ChangeSortOption option ->
             ( { model | data = RemoteData.Loading, sort = Just option }
             , Route.addFilterParams model.key
-                { sort = Just option, search = model.searchTerm, genre = model.genre }
+                { sort = Just option, search = model.searchTerm, mediaType = model.mediaType, genre = model.genre }
             )
 
 
@@ -102,11 +113,16 @@ homeFrame searchTerm mangaData =
         ]
 
 
+
+-- filter view functions
+
+
 filters : Maybe String -> Html Msg
 filters searchTerm =
     div [ class "mt-14 mx-16" ]
         [ form [ onSubmit OnSubmit, class "flex justify-center" ]
             [ searchFilter searchTerm
+            , mediaTypeFiler
             , genreFilter
             , diverseSortFilter
             ]
@@ -122,6 +138,26 @@ searchFilter searchTerm =
                 [ text (Maybe.withDefault "" searchTerm) ]
             ]
         ]
+
+
+mediaTypeFiler : Html Msg
+mediaTypeFiler =
+    let
+        options =
+            List.map (\mediaType -> option [ value mediaType.value ] [ text mediaType.text ]) mediaTypeOptions
+    in
+    div [ class "mr-9" ]
+        [ div [ class "text-gray-700 font-bold" ] [ text "Type" ]
+        , div []
+            [ select [ name "genres", class "h-10 mt-1 p-2 rounded shadow-l text-gray-700 bg-white", onInput ChangeMediaType ]
+                options
+            ]
+        ]
+
+
+mediaTypeOptions : List SelectOption
+mediaTypeOptions =
+    [ { value = "ANIME", text = "Anime" }, { value = "MANGA", text = "Manga" } ]
 
 
 genreFilter : Html Msg
@@ -141,22 +177,47 @@ genreFilter =
 
 listOfGenres : List String
 listOfGenres =
-    List.sort [ "Action", "Adventure", "Comedy", "Drama", "Psychological", "Romance", "Fantasy", "Horror", "Slice of Life", "Sci-Fi", "Mystery", "Mecha" ]
+    List.sort
+        [ "Action"
+        , "Adventure"
+        , "Comedy"
+        , "Drama"
+        , "Psychological"
+        , "Romance"
+        , "Fantasy"
+        , "Horror"
+        , "Slice of Life"
+        , "Sci-Fi"
+        , "Mystery"
+        , "Mecha"
+        ]
 
 
 diverseSortFilter : Html Msg
 diverseSortFilter =
+    let
+        options =
+            List.map (\diverseOption -> option [ value diverseOption.value ] [ text diverseOption.text ]) diverseSortOptions
+    in
     div []
         [ div [ class "text-gray-700 font-bold" ] [ text "Sort" ]
         , div []
             [ select [ name "sort", class "h-10 mt-1 p-2 rounded shadow-l text-gray-700 bg-white", onInput ChangeSortOption ]
-                [ option
-                    [ value "POPULARITY_DESC" ]
-                    [ text "Most Popular" ]
-                , option [ value "TRENDING_DESC" ] [ text "Trending Now" ]
-                ]
+                options
             ]
         ]
+
+
+diverseSortOptions : List SelectOption
+diverseSortOptions =
+    [ { value = "TRENDING_DESC", text = "Trending" }
+    , { value = "POPULARITY_DESC", text = "Popular" }
+    , { value = "SCORE_DESC", text = "Score Descending" }
+    ]
+
+
+
+-- manga view functions
 
 
 displayMangaList : Api.MangaData -> Html Msg

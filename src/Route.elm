@@ -1,6 +1,7 @@
 module Route exposing (FilterQueryParams, Route(..), addFilterParams, fromUrl, parser, transformParams)
 
 import AniList.Enum.MediaSort exposing (MediaSort)
+import AniList.Enum.MediaType
 import AniList.Object exposing (Media)
 import Api
 import Browser.Navigation as Nav
@@ -19,6 +20,7 @@ type Route
 
 type alias FilterQueryParams =
     { search : Maybe String
+    , mediaType : Maybe String
     , genre : Maybe String
     , sort : Maybe String
     }
@@ -32,7 +34,7 @@ parser =
 
 filterQueryParams : Query.Parser FilterQueryParams
 filterQueryParams =
-    Query.map3 FilterQueryParams (Query.string "search") (Query.string "genre") (Query.string "sort")
+    Query.map4 FilterQueryParams (Query.string "search") (Query.string "type") (Query.string "genre") (Query.string "sort")
 
 
 fromUrl : Url.Url -> Maybe Route
@@ -50,8 +52,13 @@ addFilterParams key params =
 
 
 parseParams : FilterQueryParams -> List Builder.QueryParameter
-parseParams { search, genre, sort } =
-    Maybe.Extra.values [ Maybe.map (Builder.string "search") search, Maybe.map (Builder.string "genre") genre, Maybe.map (Builder.string "sort") sort ]
+parseParams { search, mediaType, genre, sort } =
+    Maybe.Extra.values
+        [ Maybe.map (Builder.string "search") search
+        , Maybe.map (Builder.string "type") mediaType
+        , Maybe.map (Builder.string "genre") genre
+        , Maybe.map (Builder.string "sort") sort
+        ]
 
 
 
@@ -59,15 +66,26 @@ parseParams { search, genre, sort } =
 
 
 transformParams : FilterQueryParams -> Api.Filter
-transformParams filterQueryPrams =
-    { search = GqlOptional.fromMaybe filterQueryPrams.search
-    , genre = GqlOptional.fromMaybe filterQueryPrams.genre
-    , sort = GqlOptional.fromMaybe (Just [ fromMaybeStringToMediaSort filterQueryPrams.sort ])
+transformParams { search, mediaType, genre, sort } =
+    { search = GqlOptional.fromMaybe search
+    , mediaType = GqlOptional.fromMaybe (fromMaybeStringToMediaType mediaType)
+    , genre = GqlOptional.fromMaybe genre
+    , sort = GqlOptional.fromMaybe (Just [ fromMaybeStringToMediaSort sort ])
     }
 
 
 
 -- turn a Maybe String into an MediaSort enum that the optional arguments can recognise
+
+
+fromMaybeStringToMediaType : Maybe String -> Maybe AniList.Enum.MediaType.MediaType
+fromMaybeStringToMediaType mediaType =
+    case mediaType of
+        Just mt ->
+            AniList.Enum.MediaType.fromString mt
+
+        Nothing ->
+            AniList.Enum.MediaType.fromString "ANIME"
 
 
 fromMaybeStringToMediaSort : Maybe String -> Maybe AniList.Enum.MediaSort.MediaSort
