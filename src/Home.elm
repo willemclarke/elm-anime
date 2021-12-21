@@ -96,7 +96,7 @@ view model =
 
 homeFrame : Maybe String -> Api.MangaData -> Html Msg
 homeFrame searchTerm mangaData =
-    div [ class "h-full" ]
+    div [ class "flex flex-col h-full" ]
         [ filters searchTerm
         , displayMangaList mangaData
         ]
@@ -105,7 +105,7 @@ homeFrame searchTerm mangaData =
 filters : Maybe String -> Html Msg
 filters searchTerm =
     div [ class "mt-14 mx-16" ]
-        [ form [ onSubmit OnSubmit, class "flex" ]
+        [ form [ onSubmit OnSubmit, class "flex justify-center" ]
             [ searchFilter searchTerm
             , genreFilter
             , diverseSortFilter
@@ -176,8 +176,10 @@ displayMangaList response =
         Success resp ->
             case resp of
                 Just pageOfManga ->
-                    div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6" ]
-                        (List.map displayManga (Api.sanitizeMangaList pageOfManga.manga))
+                    div [ class "flex justify-center" ]
+                        [ div [ class "mx-16 mt-10 mb-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-x-10 gap-y-8" ]
+                            (List.map displayManga (Api.sanitizeMangaList pageOfManga.manga))
+                        ]
 
                 Nothing ->
                     text "No manga's to display"

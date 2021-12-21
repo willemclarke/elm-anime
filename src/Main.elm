@@ -124,7 +124,7 @@ view model =
 pageFrame : Bool -> Html Msg -> Html Msg
 pageFrame isLoading content =
     div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
-        [ div [ class "xl:w-9/12 lg:w-10/12 md:w-10/12" ]
+        [ div []
             [ if isLoading then
                 loadingSpinner
 
