@@ -8,6 +8,7 @@ import Html.Attributes exposing (class, href)
 import Loading
     exposing
         ( LoaderType(..)
+        , defaultConfig
         )
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route(..))
@@ -37,7 +38,7 @@ main =
 
 
 type alias Model =
-    { key : Nav.Key, page : Page }
+    { key : Nav.Key, page : Page, isLoading : Bool }
 
 
 type Page
@@ -47,7 +48,7 @@ type Page
 
 init : () -> Url.Url -> Nav.Key -> ( Model, Cmd Msg )
 init _ url navKey =
-    updateUrl url { page = NotFound, key = navKey }
+    updateUrl url { key = navKey, page = NotFound, isLoading = True }
 
 
 
@@ -77,7 +78,7 @@ update message model =
         GotHomeMsg homeMsg ->
             case model.page of
                 HomePage homeModel ->
-                    toHome model (Home.update homeMsg homeModel)
+                    toHome { model | isLoading = False } (Home.update homeMsg homeModel)
 
                 NotFound ->
                     ( model, Cmd.none )
@@ -96,7 +97,7 @@ updateUrl url model =
                 |> toHome model
 
         Nothing ->
-            ( { model | page = NotFound }, Cmd.none )
+            ( { model | page = NotFound, isLoading = False }, Cmd.none )
 
 
 
@@ -116,15 +117,19 @@ view model =
                     pageNotFound
     in
     { title = "elm-manga"
-    , body = [ pageFrame content ]
+    , body = [ pageFrame model.isLoading content ]
     }
 
 
-pageFrame : Html Msg -> Html Msg
-pageFrame content =
+pageFrame : Bool -> Html Msg -> Html Msg
+pageFrame isLoading content =
     div [ class "flex justify-center h-full bg-gray-100 mt-6" ]
-        [ div [ class "w:xl-9/12" ]
-            [ pageHeader
+        [ div [ class "w-fit" ]
+            [ if isLoading then
+                loadingSpinner
+
+              else
+                pageHeader
             , content
             ]
         ]
@@ -132,12 +137,22 @@ pageFrame content =
 
 pageHeader : Html Msg
 pageHeader =
-    h1 [ class "text-center mt-9 text-3xl 2xl:text-4xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
+    h1 [ class "text-center mt-9 text-3xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ] [ text "elm-manga" ]
 
 
 pageNotFound : Html Msg
 pageNotFound =
     h1 [ class "mt-4 text-lg font-bold text-gray-700" ] [ text "Sorry, this page doesn't exist :(" ]
+
+
+loadingSpinner : Html Msg
+loadingSpinner =
+    div [ class "flex h-full justify-center items-center mt-8" ]
+        [ Loading.render
+            Circle
+            { defaultConfig | color = "#333" }
+            Loading.On
+        ]
 
 
 

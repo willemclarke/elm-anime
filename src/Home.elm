@@ -93,7 +93,7 @@ homeFrame searchTerm mangaData =
 
 filters : Maybe String -> Html Msg
 filters searchTerm =
-    div [ class "flex mt-10 mx-16" ]
+    div [ class "mt-10 mx-16" ]
         [ form [ class "flex" ]
             [ searchFilter searchTerm
             , genreFilter
@@ -157,7 +157,7 @@ displayMangaList response =
         Success resp ->
             case resp of
                 Just pageOfManga ->
-                    div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6" ]
+                    div [ class "mx-16 mt-8 mb-16 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6" ]
                         (List.map displayManga (Api.sanitizeMangaList pageOfManga.manga))
 
                 Nothing ->
