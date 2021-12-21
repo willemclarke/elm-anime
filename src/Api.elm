@@ -42,7 +42,7 @@ type alias CoverImage =
 
 
 type alias Filter =
-    { search : OptionalArgument String, genre : OptionalArgument String }
+    { search : OptionalArgument String, genre : OptionalArgument String, sort : OptionalArgument (List (Maybe AniList.Enum.MediaSort.MediaSort)) }
 
 
 query : Filter -> SelectionSet (Maybe Page) RootQuery
@@ -51,15 +51,15 @@ query filter =
 
 
 pageSelection : Filter -> SelectionSet Page AniList.Object.Page
-pageSelection { search, genre } =
+pageSelection { search, genre, sort } =
     SelectionSet.map Page
         (Page.media
             (\optionals ->
                 { optionals
                     | search = search
                     , genre = genre
+                    , sort = sort
                     , type_ = Present AniList.Enum.MediaType.Manga
-                    , sort = Present [ Just AniList.Enum.MediaSort.ScoreDesc ]
                     , isAdult = Present False
                 }
             )

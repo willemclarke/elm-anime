@@ -4,7 +4,7 @@ import Api
 import Browser.Navigation
 import Graphql.Http
 import Html exposing (..)
-import Html.Attributes exposing (class, href, name, placeholder, src, type_, value)
+import Html.Attributes exposing (class, href, name, placeholder, selected, src, type_, value)
 import Html.Events exposing (onInput, onSubmit)
 import Loading
     exposing
@@ -21,12 +21,12 @@ import Route
 
 
 type alias Model =
-    { key : Browser.Navigation.Key, data : Api.MangaData, searchTerm : Maybe String, genre : Maybe String }
+    { key : Browser.Navigation.Key, data : Api.MangaData, searchTerm : Maybe String, genre : Maybe String, sort : Maybe String }
 
 
 init : Route.FilterQueryParams -> Browser.Navigation.Key -> ( Model, Cmd Msg )
 init params navKey =
-    ( { key = navKey, data = RemoteData.Loading, searchTerm = params.search, genre = params.genre }, fetchManga params )
+    ( { key = navKey, data = RemoteData.Loading, searchTerm = params.search, genre = params.genre, sort = params.sort }, fetchManga params )
 
 
 fetchManga : Route.FilterQueryParams -> Cmd Msg
@@ -45,6 +45,7 @@ type Msg
     = GotResponse Api.MangaData
     | ChangeInput String
     | ChangeGenre String
+    | ChangeSortOption String
     | OnSubmit
 
 
@@ -66,10 +67,22 @@ update msg model =
             ( { model | searchTerm = searchTerm }, Cmd.none )
 
         OnSubmit ->
-            ( { model | data = RemoteData.Loading }, Route.addFilterParams model.key { search = model.searchTerm, genre = model.genre } )
+            ( { model | data = RemoteData.Loading }
+            , Route.addFilterParams model.key
+                { search = model.searchTerm, genre = model.genre, sort = model.sort }
+            )
 
         ChangeGenre genre ->
-            ( { model | data = RemoteData.Loading, genre = Just genre }, Route.addFilterParams model.key { search = model.searchTerm, genre = Just genre } )
+            ( { model | data = RemoteData.Loading, genre = Just genre }
+            , Route.addFilterParams model.key
+                { genre = Just genre, search = model.searchTerm, sort = model.sort }
+            )
+
+        ChangeSortOption option ->
+            ( { model | data = RemoteData.Loading, sort = Just option }
+            , Route.addFilterParams model.key
+                { sort = Just option, search = model.searchTerm, genre = model.genre }
+            )
 
 
 
@@ -95,6 +108,7 @@ filters searchTerm =
         [ form [ onSubmit OnSubmit, class "flex" ]
             [ searchFilter searchTerm
             , genreFilter
+            , diverseSortFilter
             ]
         ]
 
@@ -116,7 +130,7 @@ genreFilter =
         options =
             List.map (\genre -> option [ value genre ] [ text genre ]) listOfGenres
     in
-    div []
+    div [ class "mr-9" ]
         [ div [ class "text-gray-700 font-bold" ] [ text "Genres" ]
         , div []
             [ select [ name "genres", class "h-10 mt-1 p-2 rounded shadow-l text-gray-700 bg-white", onInput ChangeGenre ]
@@ -128,6 +142,21 @@ genreFilter =
 listOfGenres : List String
 listOfGenres =
     List.sort [ "Action", "Adventure", "Comedy", "Drama", "Psychological", "Romance", "Fantasy", "Horror", "Slice of Life", "Sci-Fi", "Mystery", "Mecha" ]
+
+
+diverseSortFilter : Html Msg
+diverseSortFilter =
+    div []
+        [ div [ class "text-gray-700 font-bold" ] [ text "Sort" ]
+        , div []
+            [ select [ name "sort", class "h-10 mt-1 p-2 rounded shadow-l text-gray-700 bg-white", onInput ChangeSortOption ]
+                [ option
+                    [ value "POPULARITY_DESC" ]
+                    [ text "Most Popular" ]
+                , option [ value "TRENDING_DESC" ] [ text "Trending Now" ]
+                ]
+            ]
+        ]
 
 
 loadingSpinner : Html Msg
