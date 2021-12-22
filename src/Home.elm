@@ -4,7 +4,7 @@ import Api
 import Browser.Navigation
 import Graphql.Http
 import Html exposing (..)
-import Html.Attributes exposing (class, href, name, placeholder, selected, src, type_, value)
+import Html.Attributes exposing (class, href, id, name, placeholder, selected, src, type_, value)
 import Html.Events exposing (onInput, onSubmit)
 import Loading
     exposing
@@ -21,7 +21,7 @@ import Route
 
 
 type alias Model =
-    { key : Browser.Navigation.Key, data : Api.MangaData, searchTerm : Maybe String, mediaType : Maybe String, genre : Maybe String, sort : Maybe String }
+    { key : Browser.Navigation.Key, data : Api.MediaData, searchTerm : Maybe String, mediaType : Maybe String, genre : Maybe String, sort : Maybe String }
 
 
 type alias SelectOption =
@@ -46,7 +46,7 @@ fetchManga queryParams =
 
 
 type Msg
-    = GotResponse Api.MangaData
+    = GotResponse Api.MediaData
     | ChangeInput String
     | ChangeMediaType String
     | ChangeGenre String
@@ -102,14 +102,14 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    homeFrame model.searchTerm model.data
+    homeFrame model.searchTerm model.mediaType model.data
 
 
-homeFrame : Maybe String -> Api.MangaData -> Html Msg
-homeFrame searchTerm mangaData =
+homeFrame : Maybe String -> Maybe String -> Api.MediaData -> Html Msg
+homeFrame searchTerm mediaType mangaData =
     div [ class "flex flex-col h-full" ]
         [ filters searchTerm
-        , displayMangaList mangaData
+        , displayMediaList mediaType mangaData
         ]
 
 
@@ -134,7 +134,7 @@ searchFilter searchTerm =
     div [ class "mr-9" ]
         [ div [ class "text-gray-700 font-bold" ] [ text "Search" ]
         , div []
-            [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 h-10", placeholder "Search manga", type_ "search", onInput ChangeInput ]
+            [ input [ class "mt-1 p-2 rounded shadow-l text-gray-700 h-10", placeholder "Search anime/manga", type_ "search", onInput ChangeInput ]
                 [ text (Maybe.withDefault "" searchTerm) ]
             ]
         ]
@@ -213,15 +213,18 @@ diverseSortOptions =
     [ { value = "TRENDING_DESC", text = "Trending" }
     , { value = "POPULARITY_DESC", text = "Popular" }
     , { value = "SCORE_DESC", text = "Score Descending" }
+    , { value = "FAVOURITES_DESC", text = "Most Favourited" }
+    , { value = "START_DATE_DESC", text = "Latest" }
+    , { value = "START_DATE", text = "Oldest" }
     ]
 
 
 
--- manga view functions
+-- anime/manga view functions
 
 
-displayMangaList : Api.MangaData -> Html Msg
-displayMangaList response =
+displayMediaList : Maybe String -> Api.MediaData -> Html Msg
+displayMediaList mediaType response =
     case response of
         Loading ->
             div [ class "flex h-full justify-center items-center" ]
@@ -232,33 +235,49 @@ displayMangaList response =
             text "Not asked"
 
         Failure _ ->
-            text "Failed to fetch list of manga's"
+            text "Failed to fetch list of anime/mangas"
 
         Success resp ->
             case resp of
-                Just pageOfManga ->
+                Just pageOfMedia ->
                     div [ class "flex justify-center" ]
                         [ div [ class "mx-16 mt-10 mb-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-x-10 gap-y-8" ]
-                            (List.map displayManga (Api.sanitizeMangaList pageOfManga.manga))
+                            (List.map (displayMedia mediaType) (Api.sanitizeMediaList pageOfMedia.media))
                         ]
 
                 Nothing ->
-                    text "No manga's to display"
+                    text "No anime/manga to display"
 
 
-displayManga : Api.Manga -> Html Msg
-displayManga manga =
-    a [ href ("https://anilist.co/manga/" ++ String.fromInt manga.id) ]
+displayMedia : Maybe String -> Api.Media -> Html Msg
+displayMedia mediaType media =
+    a [ href (mediaHref mediaType media.id) ]
         [ div [ class "w-48 h-90 text-center text-gray-700 bg-white rounded overflow-hidden shadow-lg hover:text-indigo-900 hover:shadow-2xl" ]
-            [ img [ src (Api.sanitizeCoverImage manga.coverImage), class "h-64 w-full" ]
+            [ img [ src (Api.sanitizeCoverImage media.coverImage), class "h-64 w-full" ]
                 []
             , div
                 []
-                [ p [ class "text-l font-bold truncate mx-2 mt-1 hover:underline" ] [ text (Api.sanitizeTitle manga.title) ]
-                , displayGenres (Api.sanitizeGenres manga.genres)
+                [ p [ class "text-l font-bold truncate mx-2 mt-1 hover:underline" ] [ text (Api.sanitizeTitle media.title) ]
+                , displayGenres (Api.sanitizeGenres media.genres)
                 ]
             ]
         ]
+
+
+mediaHref : Maybe String -> Int -> String
+mediaHref mediaType id =
+    let
+        stringMediaType =
+            Maybe.withDefault "anime" mediaType
+
+        word =
+            String.toLower stringMediaType
+    in
+    if word == "anime" then
+        "https://anilist.co/anime/" ++ String.fromInt id
+
+    else
+        "https://anilist.co/manga/" ++ String.fromInt id
 
 
 displayGenres : List String -> Html Msg

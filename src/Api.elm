@@ -1,4 +1,4 @@
-module Api exposing (Filter, Manga, MangaData, query, sanitizeAverageScore, sanitizeCoverImage, sanitizeGenres, sanitizeMangaList, sanitizeTitle)
+module Api exposing (Filter, Media, MediaData, query, sanitizeAverageScore, sanitizeCoverImage, sanitizeGenres, sanitizeMediaList, sanitizeTitle)
 
 import AniList.Enum.MediaSort
 import AniList.Enum.MediaType
@@ -17,7 +17,7 @@ import Maybe.Extra exposing (or)
 import RemoteData exposing (RemoteData)
 
 
-type alias MangaData =
+type alias MediaData =
     RemoteData (Graphql.Http.Error Response) Response
 
 
@@ -26,11 +26,16 @@ type alias Response =
 
 
 type alias Page =
-    { manga : Maybe (List (Maybe Manga)) }
+    { media : Maybe (List (Maybe Media)) }
 
 
-type alias Manga =
-    { id : Int, averageScore : Maybe Int, title : Maybe Title, coverImage : Maybe CoverImage, genres : Maybe (List (Maybe String)) }
+type alias Media =
+    { id : Int
+    , averageScore : Maybe Int
+    , title : Maybe Title
+    , coverImage : Maybe CoverImage
+    , genres : Maybe (List (Maybe String))
+    }
 
 
 type alias Title =
@@ -42,7 +47,11 @@ type alias CoverImage =
 
 
 type alias Filter =
-    { search : OptionalArgument String, mediaType : OptionalArgument AniList.Enum.MediaType.MediaType, genre : OptionalArgument String, sort : OptionalArgument (List (Maybe AniList.Enum.MediaSort.MediaSort)) }
+    { search : OptionalArgument String
+    , mediaType : OptionalArgument AniList.Enum.MediaType.MediaType
+    , genre : OptionalArgument String
+    , sort : OptionalArgument (List (Maybe AniList.Enum.MediaSort.MediaSort))
+    }
 
 
 query : Filter -> SelectionSet (Maybe Page) RootQuery
@@ -67,9 +76,9 @@ pageSelection { search, mediaType, genre, sort } =
         )
 
 
-mediaSelection : SelectionSet Manga AniList.Object.Media
+mediaSelection : SelectionSet Media AniList.Object.Media
 mediaSelection =
-    SelectionSet.map5 Manga
+    SelectionSet.map5 Media
         Media.id
         Media.averageScore
         (Media.title titleSelection)
@@ -94,9 +103,9 @@ coverImageSelection =
 -- helpers to handle Maybe's, which this api's schema was rife with
 
 
-sanitizeMangaList : Maybe (List (Maybe Manga)) -> List Manga
-sanitizeMangaList mangaList =
-    case mangaList of
+sanitizeMediaList : Maybe (List (Maybe Media)) -> List Media
+sanitizeMediaList mediaList =
+    case mediaList of
         Just list ->
             List.filterMap identity list
 
