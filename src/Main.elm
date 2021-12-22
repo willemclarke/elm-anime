@@ -137,8 +137,11 @@ pageFrame isLoading content =
 
 pageHeader : Html Msg
 pageHeader =
-    h1 [ class "text-center mt-9 pb-2 text-5xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ]
-        [ text "elm-anime" ]
+    a [ href "/" ]
+        [ h1
+            [ class "text-center mt-9 pb-2 text-5xl filter drop-shadow-sm font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-900 to-blue-400" ]
+            [ text "elm-anime" ]
+        ]
 
 
 pageNotFound : Html Msg
