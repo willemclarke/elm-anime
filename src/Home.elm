@@ -215,6 +215,7 @@ listOfGenres =
         [ "Action"
         , "Adventure"
         , "Comedy"
+        , "Sports"
         , "Drama"
         , "Psychological"
         , "Romance"
