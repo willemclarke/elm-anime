@@ -21,7 +21,10 @@ import Route
 
 
 type alias Model =
-    { key : Browser.Navigation.Key, data : Api.MediaData, searchTerm : Maybe String, mediaType : Maybe String, genre : Maybe String, sort : Maybe String }
+    { key : Browser.Navigation.Key
+    , data : Api.MediaData
+    , queryParams : Route.FilterQueryParams
+    }
 
 
 type alias SelectOption =
@@ -30,7 +33,7 @@ type alias SelectOption =
 
 init : Route.FilterQueryParams -> Browser.Navigation.Key -> ( Model, Cmd Msg )
 init params navKey =
-    ( { key = navKey, data = RemoteData.Loading, searchTerm = params.search, mediaType = params.mediaType, genre = params.genre, sort = params.sort }, fetchManga params )
+    ( { key = navKey, data = RemoteData.Loading, queryParams = params }, fetchManga params )
 
 
 fetchManga : Route.FilterQueryParams -> Cmd Msg
@@ -68,32 +71,63 @@ update msg model =
 
                     else
                         Just newInput
+
+                newSearchParam =
+                    updateSearchParam searchTerm model.queryParams
             in
-            ( { model | searchTerm = searchTerm }, Cmd.none )
+            ( { model | queryParams = newSearchParam }, Cmd.none )
 
         ChangeMediaType mediaType ->
-            ( { model | data = RemoteData.Loading, mediaType = Just mediaType }
-            , Route.addFilterParams model.key
-                { mediaType = Just mediaType, search = model.searchTerm, genre = model.genre, sort = model.sort }
+            let
+                newMediaTypeParam =
+                    updateMediaTypeParam mediaType model.queryParams
+            in
+            ( { model | data = RemoteData.Loading, queryParams = newMediaTypeParam }
+            , Route.addFilterParams model.key newMediaTypeParam
             )
 
         OnSubmit ->
             ( { model | data = RemoteData.Loading }
-            , Route.addFilterParams model.key
-                { search = model.searchTerm, mediaType = model.mediaType, genre = model.genre, sort = model.sort }
+            , Route.addFilterParams model.key model.queryParams
             )
 
         ChangeGenre genre ->
-            ( { model | data = RemoteData.Loading, genre = Just genre }
-            , Route.addFilterParams model.key
-                { genre = Just genre, search = model.searchTerm, mediaType = model.mediaType, sort = model.sort }
+            let
+                newGenreParam =
+                    updateGenreParam genre model.queryParams
+            in
+            ( { model | data = RemoteData.Loading, queryParams = newGenreParam }
+            , Route.addFilterParams model.key newGenreParam
             )
 
         ChangeSortOption option ->
-            ( { model | data = RemoteData.Loading, sort = Just option }
-            , Route.addFilterParams model.key
-                { sort = Just option, search = model.searchTerm, mediaType = model.mediaType, genre = model.genre }
+            let
+                newSortParam =
+                    updateSortParam option model.queryParams
+            in
+            ( { model | data = RemoteData.Loading, queryParams = newSortParam }
+            , Route.addFilterParams model.key newSortParam
             )
+
+
+updateSearchParam : Maybe String -> Route.FilterQueryParams -> Route.FilterQueryParams
+updateSearchParam searchTerm params =
+    { params | search = searchTerm }
+
+
+updateMediaTypeParam : String -> Route.FilterQueryParams -> Route.FilterQueryParams
+updateMediaTypeParam mediaType params =
+    { params | mediaType = Just mediaType }
+
+
+updateSortParam : String -> Route.FilterQueryParams -> Route.FilterQueryParams
+updateSortParam option params =
+    { params | sort = Just option }
+
+
+updateGenreParam : String -> Route.FilterQueryParams -> Route.FilterQueryParams
+updateGenreParam genre params =
+    { params | genre = Just genre }
 
 
 
@@ -102,7 +136,7 @@ update msg model =
 
 view : Model -> Html Msg
 view model =
-    homeFrame model.searchTerm model.mediaType model.data
+    homeFrame model.queryParams.search model.queryParams.mediaType model.data
 
 
 homeFrame : Maybe String -> Maybe String -> Api.MediaData -> Html Msg
@@ -272,12 +306,15 @@ mediaHref mediaType id =
 
         word =
             String.toLower stringMediaType
+
+        toStringId =
+            String.fromInt id
     in
     if word == "anime" then
-        "https://anilist.co/anime/" ++ String.fromInt id
+        "https://anilist.co/anime/" ++ toStringId
 
     else
-        "https://anilist.co/manga/" ++ String.fromInt id
+        "https://anilist.co/manga/" ++ toStringId
 
 
 displayGenres : List String -> Html Msg
