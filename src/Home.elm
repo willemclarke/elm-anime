@@ -2,9 +2,10 @@ module Home exposing (..)
 
 import Api
 import Browser.Navigation
+import Debounce exposing (Debounce)
 import Graphql.Http
 import Html exposing (..)
-import Html.Attributes exposing (class, href, id, name, placeholder, selected, src, type_, value)
+import Html.Attributes exposing (class, href, id, name, placeholder, src, type_, value)
 import Html.Events exposing (onInput, onSubmit)
 import Loading
     exposing
@@ -14,6 +15,7 @@ import Loading
 import Process
 import RemoteData exposing (RemoteData(..))
 import Route
+import Task
 
 
 
@@ -24,6 +26,7 @@ type alias Model =
     { key : Browser.Navigation.Key
     , data : Api.MediaData
     , queryParams : Route.FilterQueryParams
+    , debounce : Debounce String
     }
 
 
@@ -33,7 +36,7 @@ type alias SelectOption =
 
 init : Route.FilterQueryParams -> Browser.Navigation.Key -> ( Model, Cmd Msg )
 init params navKey =
-    ( { key = navKey, data = RemoteData.Loading, queryParams = params }, fetchManga params )
+    ( { key = navKey, data = RemoteData.Loading, queryParams = params, debounce = Debounce.init }, fetchManga params )
 
 
 fetchManga : Route.FilterQueryParams -> Cmd Msg
@@ -44,6 +47,13 @@ fetchManga queryParams =
         |> Graphql.Http.send (RemoteData.fromResult >> GotResponse)
 
 
+debounceConfig : Debounce.Config Msg
+debounceConfig =
+    { strategy = Debounce.later 500
+    , transform = DebounceMsg
+    }
+
+
 
 -- UPDATE
 
@@ -51,10 +61,12 @@ fetchManga queryParams =
 type Msg
     = GotResponse Api.MediaData
     | ChangeInput String
+    | DebounceMsg Debounce.Msg
+    | SubmitInput String
     | ChangeMediaType String
     | ChangeGenre String
     | ChangeSortOption String
-    | OnSubmit
+    | NoOp
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
@@ -65,17 +77,37 @@ update msg model =
 
         ChangeInput newInput ->
             let
+                ( debounce, cmd ) =
+                    Debounce.push debounceConfig newInput model.debounce
+            in
+            ( { model | debounce = debounce }
+            , cmd
+            )
+
+        DebounceMsg msg_ ->
+            let
+                ( debounce, cmd ) =
+                    Debounce.update
+                        debounceConfig
+                        (Debounce.takeLast submitInput)
+                        msg_
+                        model.debounce
+            in
+            ( { model | debounce = debounce }, cmd )
+
+        SubmitInput string ->
+            let
                 searchTerm =
-                    if String.isEmpty newInput then
+                    if String.isEmpty string then
                         Nothing
 
                     else
-                        Just newInput
+                        Just string
 
                 newSearchParam =
                     updateSearchParam searchTerm model.queryParams
             in
-            ( { model | queryParams = newSearchParam }, Cmd.none )
+            ( { model | data = RemoteData.Loading, queryParams = newSearchParam }, Route.addFilterParams model.key newSearchParam )
 
         ChangeMediaType mediaType ->
             let
@@ -84,11 +116,6 @@ update msg model =
             in
             ( { model | data = RemoteData.Loading, queryParams = newMediaTypeParam }
             , Route.addFilterParams model.key newMediaTypeParam
-            )
-
-        OnSubmit ->
-            ( { model | data = RemoteData.Loading }
-            , Route.addFilterParams model.key model.queryParams
             )
 
         ChangeGenre genre ->
@@ -108,6 +135,14 @@ update msg model =
             ( { model | data = RemoteData.Loading, queryParams = newSortParam }
             , Route.addFilterParams model.key newSortParam
             )
+
+        NoOp ->
+            ( model, Cmd.none )
+
+
+submitInput : String -> Cmd Msg
+submitInput searchTerm =
+    Task.perform SubmitInput (Task.succeed searchTerm)
 
 
 updateSearchParam : Maybe String -> Route.FilterQueryParams -> Route.FilterQueryParams
@@ -153,8 +188,8 @@ homeFrame searchTerm mediaType mangaData =
 
 filters : Maybe String -> Html Msg
 filters searchTerm =
-    div [ class "mt-14 mx-16" ]
-        [ form [ onSubmit OnSubmit, class "flex justify-center" ]
+    div [ onSubmit NoOp, class "mt-14 mx-16" ]
+        [ form [ class "flex justify-center" ]
             [ searchFilter searchTerm
             , mediaTypeFiler
             , genreFilter

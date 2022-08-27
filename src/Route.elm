@@ -1,11 +1,11 @@
 module Route exposing (FilterQueryParams, Route(..), addFilterParams, fromUrl, parser, transformParams)
 
-import AniList.Enum.MediaSort exposing (MediaSort)
+import AniList.Enum.MediaSort
 import AniList.Enum.MediaType
-import AniList.Object exposing (Media)
+import AniList.Object
 import Api
 import Browser.Navigation as Nav
-import Graphql.Internal.Builder.Argument exposing (Argument)
+import Graphql.Internal.Builder.Argument
 import Graphql.OptionalArgument as GqlOptional
 import Maybe.Extra
 import Url
@@ -44,11 +44,11 @@ fromUrl url =
 
 addFilterParams : Nav.Key -> FilterQueryParams -> Cmd msg
 addFilterParams key params =
-    Nav.replaceUrl key <| Builder.relative [] (parseParams params)
+    Nav.replaceUrl key <| Builder.absolute [] (parseParams params)
 
 
 
--- only append parameters that are present values
+-- only append parameters that are Just values
 
 
 parseParams : FilterQueryParams -> List Builder.QueryParameter

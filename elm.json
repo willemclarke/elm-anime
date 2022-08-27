@@ -16,6 +16,7 @@
             "elm-community/html-extra": "3.4.0",
             "elm-community/maybe-extra": "5.2.1",
             "ghivert/elm-graphql": "5.0.0",
+            "jinjor/elm-debounce": "3.0.0",
             "krisajenkins/remotedata": "6.0.1",
             "perzanko/elm-loading": "2.0.4"
         },

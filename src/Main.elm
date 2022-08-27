@@ -12,7 +12,7 @@ import Loading
         )
 import RemoteData exposing (RemoteData(..))
 import Route exposing (Route(..))
-import Task exposing (perform)
+import Task
 import Url exposing (..)
 import Url.Parser exposing ((</>), (<?>))
 
